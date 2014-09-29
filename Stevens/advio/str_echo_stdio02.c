@@ -10,5 +10,8 @@ str_echo(int sockfd)
 	fpout = Fdopen(sockfd, "w");
 
 	while (Fgets(line, MAXLINE, fpin) != NULL)
+        {
+                printf("Server Echo recieved : %s\n", line);
 		Fputs(line, fpout);
+        }
 }
