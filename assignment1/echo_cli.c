@@ -2,6 +2,32 @@
 #define MAXBUF 4096
 #define AFI AF_INET
 
+void str_echoCli(FILE *fp, int sockfd)
+{
+	char	sendline[MAXBUF], recvline[MAXBUF];
+	char	*ptr;
+        int     len, n;
+
+	while ( (ptr = fgets(sendline, MAXBUF, fp)) != NULL) {
+
+	        len = strlen(sendline);
+                if (writen(sockfd, sendline, len) != len)
+		        err_sys("writen error");
+	
+		if ((n = readline(sockfd, recvline, MAXBUF)) == 0)
+			err_quit("str_cli: server terminated prematurely");
+                else if (n < 0)
+		        err_sys("readline error");
+                        
+	        if (fputs(recvline, stdout) == EOF)
+		        err_sys("fputs error");
+		
+	}
+        if (ptr == NULL && ferror(fp))
+		err_sys("fgets error");
+
+}
+
 void start_echoClient(char *ipAddress, int portNum)
 {
         int sockFD, len;
@@ -22,16 +48,6 @@ void start_echoClient(char *ipAddress, int portNum)
         
         /* Check in you have to write an own version of this function . */
 	str_cli(stdin, sockFD);
-        /*
-        while ( (len = read(sockFD, recvBuffer, MAXLINE)) > 0) {
-		recvBuffer[len] = '\0';
-		if (fputs(recvBuffer, stdout) == EOF)
-			err_sys("fputs error");
-	}
-        
-	if (len < 0)
-		err_sys("read error");
-        */
 }
 
 /*
@@ -68,11 +84,11 @@ int main(int argc, char **argv)
     struct hostent *hp;
     struct in_addr ipv4addr;
     
-    if (argc != 3)
-            err_quit("./echo_cli <IPAddress> <PORT_NO>");
+    if (argc != 2)
+            err_quit("./echo_cli <IPAddress>");
 
     char ipAddress[100], *hostname = argv[1];
-    int portNo = atoi(argv[2]);
+    int portNo = 5001;       //atoi(argv[2]);
     
     inet_pton(AFI, ipAddress, &ipv4addr);
     hp = gethostbyaddr(&ipv4addr, sizeof(ipv4addr), AFI);

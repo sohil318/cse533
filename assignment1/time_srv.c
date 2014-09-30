@@ -63,10 +63,10 @@ int main(int argc, char **argv)
 {
         //printf("\nHello Sohil");
 
-        if (argc != 2)
-                err_quit("enter <IPAddress>");
+        if (argc != 1)
+                err_quit("./time_srv");
 
-        int portNo = atoi(argv[1]);
+        int portNo = 5002;   //atoi(argv[1]);
         start_timeServer(portNo);
         return 0;    
 }

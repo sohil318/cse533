@@ -69,7 +69,7 @@ int main(int argc, char **argv)
             err_quit("./time_cli <IPAddress> <PORT_NO>");
 
     char ipAddress[100], *hostname = argv[1];
-    int portNo = atoi(argv[2]);
+    int portNo = 5002;          //atoi(argv[2]);
     
     inet_pton(AFI, ipAddress, &ipv4addr);
     hp = gethostbyaddr(&ipv4addr, sizeof(ipv4addr), AFI);
