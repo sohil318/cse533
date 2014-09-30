@@ -65,11 +65,11 @@ int main(int argc, char **argv)
     struct hostent *hp;
     struct in_addr ipv4addr;
     
-    if (argc != 3)
-            err_quit("./time_cli <IPAddress> <PORT_NO>");
+    if (argc != 2)
+            err_quit("./time_cli <IPAddress>");
 
     char ipAddress[100], *hostname = argv[1];
-    int portNo = 5002;          //atoi(argv[2]);
+    int portNo = 5000;          //atoi(argv[2]);
     
     inet_pton(AFI, ipAddress, &ipv4addr);
     hp = gethostbyaddr(&ipv4addr, sizeof(ipv4addr), AFI);

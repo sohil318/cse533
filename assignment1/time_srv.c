@@ -66,7 +66,7 @@ int main(int argc, char **argv)
         if (argc != 1)
                 err_quit("./time_srv");
 
-        int portNo = 5002;   //atoi(argv[1]);
+        int portNo = 5000;   //atoi(argv[1]);
         start_timeServer(portNo);
         return 0;    
 }
