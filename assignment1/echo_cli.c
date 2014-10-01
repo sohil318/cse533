@@ -4,27 +4,27 @@
 
 void str_echoCli(FILE *fp, int sockfd)
 {
-	char	sendline[MAXBUF], recvline[MAXBUF];
-	char	*ptr;
+        char	sendline[MAXBUF], recvline[MAXBUF];
+        char	*ptr;
         int     len, n;
 
-	while ( (ptr = fgets(sendline, MAXBUF, fp)) != NULL) {
+        while ( (ptr = fgets(sendline, MAXBUF, fp)) != NULL) {
 
-	        len = strlen(sendline);
+                len = strlen(sendline);
                 if (writen(sockfd, sendline, len) != len)
-		        err_sys("writen error");
-	
-		if ((n = readline(sockfd, recvline, MAXBUF)) == 0)
-			err_quit("str_cli: server terminated prematurely");
+                        err_sys("writen error");
+
+                if ((n = readline(sockfd, recvline, MAXBUF)) == 0)
+                        err_quit("str_cli: server terminated prematurely");
                 else if (n < 0)
-		        err_sys("readline error");
-                        
-	        if (fputs(recvline, stdout) == EOF)
-		        err_sys("fputs error");
-		
-	}
+                        err_sys("readline error");
+
+                if (fputs(recvline, stdout) == EOF)
+                        err_sys("fputs error");
+
+        }
         if (ptr == NULL && ferror(fp))
-		err_sys("fgets error");
+                err_sys("fgets error");
 
 }
 
@@ -35,76 +35,34 @@ void start_echoClient(char *ipAddress, int portNum)
         struct sockaddr_in servAddr;
         if ( (sockFD = socket(AFI, SOCK_STREAM, 0)) < 0)
                 err_sys("socket creation error");
-        
+
         bzero(&servAddr, sizeof(servAddr));
         servAddr.sin_family = AFI;
         servAddr.sin_port = htons(portNum);
-        
+
         if (inet_pton(AFI, ipAddress, &servAddr.sin_addr) <= 0)
-		err_quit("inet_pton error for %s", ipAddress);
+                err_quit("inet_pton error for %s", ipAddress);
 
         if (connect(sockFD, (SA *) &servAddr, sizeof(servAddr)) < 0)
-		err_sys("connect error");
-        
+                err_sys("connect error");
+
         /* Check in you have to write an own version of this function . */
-	str_cli(stdin, sockFD);
-}
-
-/*
-   Get ip from domain name
- */
-
-int hostname_to_ip(char *hostname , char* ip)
-{
-        struct hostent *he;
-        struct in_addr **addr_list;
-        int i;
-
-        if ( (he = gethostbyname( hostname ) ) == NULL) 
-        {
-                // get the host info
-                //herror("gethostbyname");
-                return -1;
-        }
-
-        addr_list = (struct in_addr **) he->h_addr_list;
-
-        for(i = 0; addr_list[i] != NULL; i++) 
-        {
-                //Return the first one;
-                strcpy(ip , inet_ntoa(*addr_list[i]) );
-                return 0;
-        }
-
-        return 1;
+        str_cli(stdin, sockFD);
 }
 
 int main(int argc, char **argv)
 {
-    struct hostent *hp;
-    struct in_addr ipv4addr;
-    
-    if (argc != 2)
-            err_quit("./echo_cli <IPAddress>");
+        struct hostent *hp;
+        struct in_addr ipv4addr;
 
-    char ipAddress[100], *hostname = argv[1];
-    int portNo = 5001;       //atoi(argv[2]);
-    
-    inet_pton(AFI, ipAddress, &ipv4addr);
-    hp = gethostbyaddr(&ipv4addr, sizeof(ipv4addr), AFI);
+        if (argc != 2)
+                err_quit("./echo_cli <IPAddress>");
 
-    int ret = hostname_to_ip(hostname , ipAddress);
-    //printf("Return = %d, %s", ret, ipAddress);
-    if (strcmp(ipAddress, hostname) == 0)
-    {
-        inet_pton(AFI, ipAddress, &ipv4addr);
-        hp = gethostbyaddr(&ipv4addr, sizeof(ipv4addr), AFI);
-        printf("The server host is %s.\n", hp->h_name);
-    }
+        char *ipAddress = argv[1];
+        int portNo = 5001;       //atoi(argv[2]);
 
-    
-    start_echoClient(ipAddress, portNo);
-    
-    return 0;    
+        start_echoClient(ipAddress, portNo);
+
+        return 0;    
 }
 

@@ -64,7 +64,7 @@ int main(int argc, char **argv)
                                 perror("fork error");
                         else if (pid == 0) {
                             execlp("xterm", "xterm", "-e", "./echo_cli", ipAddress, (char *)0);
-                            printf("Return not expected. Must be an execlp error.n");
+//                            printf("Return not expected. Must be an execlp error.n");
                         }
                         break;
                 case 2:
@@ -72,7 +72,7 @@ int main(int argc, char **argv)
                                 perror("fork error");
                         else if (pid == 0) {
                             execlp("xterm", "xterm", "-e", "./time_cli", ipAddress, (char *)0);
-                            printf("Return not expected. Must be an execlp error.n");
+//                            printf("Return not expected. Must be an execlp error.n");
                         }
                         break;
                 case 3:
