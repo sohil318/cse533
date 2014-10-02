@@ -34,7 +34,9 @@ int main(int argc, char **argv)
 {
     struct hostent *hp;
     struct in_addr ipv4addr;
+    char buf[MAXLINE], temp[10];
     int n;
+    int pfd[2];
     pid_t pid;
 
     if (argc != 2)
@@ -42,8 +44,8 @@ int main(int argc, char **argv)
 
     char ipAddress[100], *hostname = argv[1];
     
-    inet_pton(AFI, ipAddress, &ipv4addr);
-    hp = gethostbyaddr(&ipv4addr, sizeof(ipv4addr), AFI);
+    //inet_pton(AFI, ipAddress, &ipv4addr);
+    //hp = gethostbyaddr(&ipv4addr, sizeof(ipv4addr), AFI);
 
     int ret = hostname_to_ip(hostname , ipAddress);
     //printf("Return = %d, %s", ret, ipAddress);
@@ -68,11 +70,30 @@ int main(int argc, char **argv)
                         }
                         break;
                 case 2:
-                        if ((pid = fork()) == -1)
+                        if (pipe(pfd) == -1)
+                        {
+                                perror("pipe failed");
+                                exit (1);
+                        }
+                        if ((pid = fork()) < 0)
                                 perror("fork error");
                         else if (pid == 0) {
-                            execlp("xterm", "xterm", "-e", "./time_cli", ipAddress, (char *)0);
+                                close(pfd[0]);
+                                printf("Enter child");
+                                sprintf(temp, "%d", pfd[1]);
+                                execlp("xterm", "xterm", "-e", "./time_cli", ipAddress, temp, (char *)0);
+                                printf("Exit child");
+                                close(pfd[1]);
 //                            printf("Return not expected. Must be an execlp error.n");
+                        }
+                        else
+                        {
+                                //printf("Enter parent client");
+                                close(pfd[1]);
+                                n = read(pfd[0], buf, 1024);
+                                if (strcmp(buf, "DONE") == 0)
+                                printf ("%s !!!", buf);
+                                close(pfd[0]);
                         }
                         break;
                 case 3:

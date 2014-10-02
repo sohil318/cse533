@@ -1,12 +1,30 @@
 #include "unp.h"
+#include <signal.h>
 #define MAXBUF 4096
 #define AFI AF_INET
 
-void start_timeClient(char *ipAddress, int portNum)
+int ppid;
+
+int sigint_handler(int signo)
 {
-        int sockFD, len;
+        if (signo == SIGINT)
+        {
+                printf ("received sigint");
+	        if (writen(ppid, "DONE", 4) != 4)
+		        err_sys("writen error");
+
+        }
+}
+
+void start_timeClient(char *ipAddress, int portNum, int pfd)
+{
+        int sockFD, len, nready, maxfdpl, n;
         char recvBuffer[MAXBUF + 1];
         struct sockaddr_in servAddr;
+        struct timeval tv;
+        fd_set  rset, allset;
+        
+        printf("Time client child");
         if ( (sockFD = socket(AFI, SOCK_STREAM, 0)) < 0)
                 err_sys("socket creation error");
         
@@ -19,15 +37,27 @@ void start_timeClient(char *ipAddress, int portNum)
         if (connect(sockFD, (SA *) &servAddr, sizeof(servAddr)) < 0)
 		err_sys("connect error");
 
-	while ( (len = read(sockFD, recvBuffer, MAXLINE)) > 0) {
-		recvBuffer[len] = '\0';
-		if (fputs(recvBuffer, stdout) == EOF)
-			err_sys("fputs error");
-	}
-
-	if (len < 0)
-		err_sys("read error");
-        
+        maxfdpl = sockFD;
+        FD_ZERO(&allset);
+        FD_SET(sockFD, &allset);
+        for (;;)
+        {
+                rset = allset;
+                nready = select(maxfdpl + 1, &rset, NULL, NULL, NULL); 
+	        if (nready < 0)
+		        err_sys("select error");
+                
+		if (FD_ISSET(sockFD, &rset)) {
+                        n = read(sockFD, recvBuffer, MAXBUF);
+                        if ( n < 0 )
+                		err_sys("read error");
+                        else if (n > 0) {
+		                recvBuffer[len] = '\0';
+		                if (fputs(recvBuffer, stdout) == EOF)
+			                err_sys("fputs error");
+                        }
+                }
+        }
 }
 
 int main(int argc, char **argv)
@@ -36,13 +66,15 @@ int main(int argc, char **argv)
     struct hostent *hp;
     struct in_addr ipv4addr;
     
-    if (argc != 2)
+    if (argc < 2)
             err_quit("./time_cli <IPAddress>");
 
     char *ipAddress = argv[1];
+    ppid = atoi(argv[2]);
     int portNo = 5000;          //atoi(argv[2]);
+    signal (SIGINT, sigint_handler);
     
-    start_timeClient(ipAddress, portNo);
+    start_timeClient(ipAddress, portNo, ppid);
     
     return 0;    
 }
