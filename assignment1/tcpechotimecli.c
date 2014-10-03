@@ -62,11 +62,30 @@ int main(int argc, char **argv)
             scanf("%d", &n);
             switch (n) {
                 case 1:
-                        if ((pid = fork()) == -1)
+                        if (pipe(pfd) == -1)
+                        {
+                                perror("pipe failed");
+                                exit (1);
+                        }
+                        if ((pid = fork()) < 0)
                                 perror("fork error");
                         else if (pid == 0) {
-                            execlp("xterm", "xterm", "-e", "./echo_cli", ipAddress, (char *)0);
+                                close(pfd[0]);
+                                printf("Enter child");
+                                sprintf(temp, "%d", pfd[1]);
+                                execlp("xterm", "xterm", "-e", "./echo_cli", ipAddress, temp, (char *)0);
+                                printf("Exit child");
+                                close(pfd[1]);
 //                            printf("Return not expected. Must be an execlp error.n");
+                        }
+                        else
+                        {
+                                //printf("Enter parent client");
+                                close(pfd[1]);
+                                n = read(pfd[0], buf, 1024);
+                                if (strcmp(buf, "DONE") == 0)
+                                printf ("%s !!!", buf);
+                                close(pfd[0]);
                         }
                         break;
                 case 2:

@@ -16,7 +16,7 @@ int sigint_handler(int signo)
         }
 }
 
-void start_timeClient(char *ipAddress, int portNum, int pfd)
+void start_timeClient(char *ipAddress, int portNum)
 {
         int sockFD, len, nready, maxfdpl, n;
         char recvBuffer[MAXBUF + 1];
@@ -62,7 +62,7 @@ int main(int argc, char **argv)
     int portNo = 5000;          //atoi(argv[2]);
     signal (SIGINT, sigint_handler);
     
-    start_timeClient(ipAddress, portNo, ppid);
+    start_timeClient(ipAddress, portNo);
     
     return 0;    
 }
