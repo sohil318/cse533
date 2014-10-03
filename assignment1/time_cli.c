@@ -59,7 +59,7 @@ int main(int argc, char **argv)
 
     char *ipAddress = argv[1];
     ppid = atoi(argv[2]);
-    int portNo = 5000;          //atoi(argv[2]);
+    int portNo = 5002;          //atoi(argv[2]);
     signal (SIGINT, sigint_handler);
     
     start_timeClient(ipAddress, portNo);
