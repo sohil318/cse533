@@ -4,7 +4,7 @@
 
 int ppid;
 
-int sigint_handler(int signo)
+void sigint_handler(int signo)
 {
         if (signo == SIGINT)
         {
