@@ -98,10 +98,10 @@ int main(int argc, char **argv)
                                 perror("fork error");
                         else if (pid == 0) {
                                 close(pfd[0]);
-                                printf("Enter child");
+//                              printf("Enter child");
                                 sprintf(temp, "%d", pfd[1]);
                                 execlp("xterm", "xterm", "-e", "./time_cli", ipAddress, temp, (char *)0);
-                                printf("Exit child");
+//                              printf("Exit child");
                                 close(pfd[1]);
 //                            printf("Return not expected. Must be an execlp error.n");
                         }
