@@ -43,14 +43,8 @@ void str_echoCli(FILE *fp, int sockFD)
 
 		if (FD_ISSET(sockFD, &rset)) {	/* socket is readable */
 	                n = readline(sockFD, recvline, MAXBUF);
-	                if (n == -1)
-		                error_handler("read error");
-			else if (n == 0) {
-				if (stdineof == 1)
-					return;		/* normal termination */
-				else
-				        error_handler("str_cli: server terminated prematurely");
-			}
+	                if (n <= 0)
+		                error_handler("Server CRASHED !!!");
 	                if (write(fileno(stdout), recvline, n) != n)
 		                error_handler("write error");
 		}

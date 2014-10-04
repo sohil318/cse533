@@ -53,7 +53,8 @@ void start_timeClient(char *ipAddress, int portNum)
 
         if (len < 0)
                 error_handler("read error");
-
+        
+        error_handler("Server CRASHED !!! ");
 }
 
 int main(int argc, char **argv)
