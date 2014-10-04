@@ -18,7 +18,7 @@ void * timeSrv(void *arg)
 
 	connFD = *((int *) arg);
 	free(arg);
-        printf("Connfd = %d", connFD);
+//        printf("Connfd = %d", connFD);
         if ( (n = pthread_detach(pthread_self())) != 0) {
         	errno = n;
 	        err_sys("pthread_detach error");
@@ -42,11 +42,12 @@ void * timeSrv(void *arg)
 		        n = read(connFD, recvBuffer, MAXBUF);
                         if ( n == -1 )
                 		err_sys("read error");
-                        else if (n <= 0) {
-                                printf("\nHere\n");
+                        else if (n == 0) {
+                                //printf("\nHere\n");
                                 if (close(connFD) == -1)
 		                        err_sys("close error");
 				FD_CLR(connFD, &allset);
+                                pthread_exit(arg);
                                 exit (0);
 
                         }
@@ -68,61 +69,41 @@ void * timeSrv(void *arg)
 	return(NULL);
 }
 
+void
+str_echoSrv(int sockFD)
+{
+	int  nbytes;
+	char buff[MAXBUF];
+
+again:
+	while ( (nbytes = read(sockFD, buff, MAXBUF)) > 0)
+        {
+                printf ("\nServer Data : %s", buff);
+	        if (writen(sockFD, buff, nbytes) != nbytes)
+		        err_sys("writen error");
+        }
+	if (nbytes < 0 && errno == EINTR)
+		goto again;
+	else if (nbytes < 0)
+		err_sys("str_echo: read error");
+}
+
 void * echoSrv(void *arg)
 {
-        int     connFD, len, maxfdpl, n, nready;
-        time_t  ticks;
-        char    recvBuffer[MAXBUF + 1];
-        struct timeval tv;
-        fd_set  rset, allset;
+        int     connFD, n;
 
 	connFD = *((int *) arg);
 	free(arg);
-
-	if ( (n = pthread_detach(pthread_self())) != 0) {
+//        printf("Connfd = %d", connFD);
+        if ( (n = pthread_detach(pthread_self())) != 0) {
         	errno = n;
-	        err_sys("pthread_detach error");
+                err_sys("pthread_detach error");
         }
-
-        maxfdpl = connFD;
-        FD_ZERO(&allset);
-        FD_SET(connFD, &allset);
-        tv.tv_sec = 5;
-        tv.tv_usec = 0;
-        while (1)
-        {
-                rset = allset;
-                nready = select(maxfdpl + 1, &rset, NULL, NULL, &tv); 
-                tv.tv_sec = 5;
-                tv.tv_usec = 0;
-	        if (nready < 0)
-		        err_sys("select error");
-                
-                if (FD_ISSET(connFD, &rset))      {
-		        n = read(connFD, recvBuffer, MAXBUF);
-                        if ( n == -1 )
-                		err_sys("read error");
-                        else if (n <= 0) {
-                                printf("\nHere\n");
-                                if (close(connFD) == -1)
-		                        err_sys("close error");
-				FD_CLR(connFD, &allset);
-                                exit (0);
-
-                        }
-                 }
-                 else {
-                                 ticks = time(NULL);
-                                 snprintf(recvBuffer, sizeof(recvBuffer), "%.24s\r\n", ctime(&ticks));
-                                 len = strlen(recvBuffer);
-                                 if (write(connFD, recvBuffer, len) != len)
-                                         err_sys("write error");
-                 }
-        }
-
+        
+        //while (1);
+        str_echo(connFD);       
         if (close(connFD) == -1)
                 err_sys("close error");
-        //        }
 
 	//Close(connfd);			/* done with connected socket */
 	return(NULL);
@@ -209,12 +190,14 @@ again:
                                         else
                                                 err_sys("accept error");
                         }
-                        printf("time thread creation %d", *connFD);
+//                        printf("time thread creation %d", *connFD);
 	                pthread_create(&tid, NULL, &timeSrv, connFD);
                 }
-/*                if (FD_ISSET(listenfdE, &rset))      {
+                if (FD_ISSET(listenfdE, &rset))      {
+                        if ((connFD = (int *)malloc(sizeof(int))) == NULL)
+                                err_sys("malloc error");
 again1:
-                        if ( (connFD = accept(listenfdE, (SA *) NULL, NULL)) < 0) {
+                        if ( (*connFD = accept(listenfdE, (SA *) NULL, NULL)) < 0) {
 #ifdef	EPROTO
                                 if (errno == EPROTO || errno == ECONNABORTED)
 #else   
@@ -224,8 +207,8 @@ again1:
                                         else
                                                 err_sys("accept error");
                         }
-	                pthread_create(&tid, NULL, &echoSrv, &connFD);
+	                pthread_create(&tid, NULL, &echoSrv, connFD);
                 }
-*/        }
+        }
 }
 
