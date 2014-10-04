@@ -16,6 +16,14 @@ void sigint_handler(int signo)
         }
 }
 
+void error_handler (char * errMsg)
+{
+        int len = strlen(errMsg);
+        if (writen(ppid, errMsg, len) != len)
+                err_sys("writen error");
+        exit (0);
+}
+
 void start_timeClient(char *ipAddress, int portNum)
 {
         int sockFD, len, nready, maxfdpl, n;
@@ -26,38 +34,36 @@ void start_timeClient(char *ipAddress, int portNum)
         
         //printf("Time client child");
         if ( (sockFD = socket(AFI, SOCK_STREAM, 0)) < 0)
-                err_sys("socket creation error");
+                error_handler("socket creation error");
         
         bzero(&servAddr, sizeof(servAddr));
         servAddr.sin_family = AFI;
         servAddr.sin_port = htons(portNum);
         if (inet_pton(AFI, ipAddress, &servAddr.sin_addr) <= 0)
-		err_quit("inet_pton error for %s", ipAddress);
-
+                error_handler("inet_pton error ");
+     
         if (connect(sockFD, (SA *) &servAddr, sizeof(servAddr)) < 0)
-		err_sys("connect error");
+		error_handler("connect error");
 
         while ( (len = read(sockFD, recvBuffer, MAXLINE)) > 0) {
                 recvBuffer[len] = '\0';
                 if (fputs(recvBuffer, stdout) == EOF)
-                        err_sys("fputs error");
+                        error_handler("fputs error");
         }
 
         if (len < 0)
-                err_sys("read error");
+                error_handler("read error");
 
 }
 
 int main(int argc, char **argv)
 {
-    //printf("\nHello Sohil");
-    
     if (argc < 2)
-            err_quit("./time_cli <IPAddress>");
+            err_quit("./time_cli <IPAddress> <pipe fd>");
 
     char *ipAddress = argv[1];
     ppid = atoi(argv[2]);
-    int portNo = 5002;          //atoi(argv[2]);
+    int portNo = 5002;        
     signal (SIGINT, sigint_handler);
     
     start_timeClient(ipAddress, portNo);

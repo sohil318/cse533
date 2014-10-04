@@ -27,14 +27,13 @@ void * timeSrv(void *arg)
         maxfdpl = connFD;
         FD_ZERO(&allset);
         FD_SET(connFD, &allset);
-        tv.tv_sec = 5;
+        tv.tv_sec  = 0;
         tv.tv_usec = 0;
+
         while (1)
         {
                 rset = allset;
                 nready = select(maxfdpl + 1, &rset, NULL, NULL, &tv); 
-                tv.tv_sec = 5;
-                tv.tv_usec = 0;
 	        if (nready < 0)
 		        err_sys("select error");
                 
@@ -59,6 +58,9 @@ void * timeSrv(void *arg)
                                  if (write(connFD, recvBuffer, len) != len)
                                          err_sys("write error");
                  }
+                tv.tv_sec = 5;
+                tv.tv_usec = 0;
+
         }
 
         if (close(connFD) == -1)

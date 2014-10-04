@@ -15,6 +15,7 @@ int hostname_to_ip(char *hostname , char* ip)
         {
                 // get the host info
                 //herror("gethostbyname");
+                strcpy(ip, "\0");
                 return -1;
         }
 
@@ -46,8 +47,12 @@ int main(int argc, char **argv)
     
     //inet_pton(AFI, ipAddress, &ipv4addr);
     //hp = gethostbyaddr(&ipv4addr, sizeof(ipv4addr), AFI);
+    
+    int ret = hostname_to_ip(hostname , ipAddress); 
+    
+    if (ret == -1)
+        printf("gethostbyname failed");
 
-    int ret = hostname_to_ip(hostname , ipAddress);
     //printf("Return = %d, %s", ret, ipAddress);
     if (strcmp(ipAddress, hostname) == 0)
     {
@@ -58,8 +63,9 @@ int main(int argc, char **argv)
     
     while (1)
     {
-            printf("\n1. Echo Client. \n2. Date-Time Client. \n3. Exit Gracefully. \nEnter your choice. (1 - 3) : \t");
-            scanf("%d", &n);
+            printf("\n\n1. Echo Client. \n2. Date-Time Client. \n3. Exit Gracefully. \nEnter your choice. (1 - 3) : \t");
+            if (!scanf("%d", &n))
+                    printf("\nInvalid Input type.");
             switch (n) {
                 case 1:
                         if (pipe(pfd) == -1)
@@ -71,20 +77,32 @@ int main(int argc, char **argv)
                                 perror("fork error");
                         else if (pid == 0) {
                                 close(pfd[0]);
-                                printf("Enter child");
                                 sprintf(temp, "%d", pfd[1]);
                                 execlp("xterm", "xterm", "-e", "./echo_cli", ipAddress, temp, (char *)0);
-                                printf("Exit child");
                                 close(pfd[1]);
-//                            printf("Return not expected. Must be an execlp error.n");
                         }
                         else
                         {
                                 //printf("Enter parent client");
                                 close(pfd[1]);
                                 n = read(pfd[0], buf, 1024);
-                                if (strcmp(buf, "DONE") == 0)
-                                printf ("%s !!!", buf);
+		                if (n == -1)
+                                        err_sys("read error");
+                                else {
+                                        buf[n] = '\0';
+                                        if ( n == 0 )
+                                        {
+                                                printf ("\nEcho Child Terminated !!!\n");
+                                                wait(NULL);
+                                        }
+                                        else if (strcmp(buf, "DONE") == 0)
+                                        {
+                                                printf ("\nEcho Forked Child Terminated !!!\n");
+                                                wait(NULL);
+                                        }
+                                        else
+                                                printf ("\nPipe Message from Echo Client : %s\n", buf);
+                                }
                                 close(pfd[0]);
                         }
                         break;
@@ -98,20 +116,32 @@ int main(int argc, char **argv)
                                 perror("fork error");
                         else if (pid == 0) {
                                 close(pfd[0]);
-//                              printf("Enter child");
                                 sprintf(temp, "%d", pfd[1]);
                                 execlp("xterm", "xterm", "-e", "./time_cli", ipAddress, temp, (char *)0);
-//                              printf("Exit child");
                                 close(pfd[1]);
-//                            printf("Return not expected. Must be an execlp error.n");
                         }
                         else
                         {
                                 //printf("Enter parent client");
                                 close(pfd[1]);
                                 n = read(pfd[0], buf, 1024);
-                                if (strcmp(buf, "DONE") == 0)
-                                printf ("%s !!!", buf);
+                                if (n == -1)
+                                        err_sys("read error");
+                                else {
+                                        buf[n] = '\0';
+                                        if ( n == 0 )
+                                        {
+                                                printf ("\nTime Child Terminated !!!\n");
+                                                wait(NULL);
+                                        }
+                                        else if (strcmp(buf, "DONE") == 0)
+                                        {
+                                                printf ("\nTime Forked Child Terminated !!!\n");
+                                                wait(NULL);
+                                        }
+                                        else
+                                                printf ("\nPipe Message from Time Client : %s\n", buf);
+                                }
                                 close(pfd[0]);
                         }
                         break;

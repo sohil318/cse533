@@ -15,6 +15,14 @@ void sigint_handler(int signo)
         }
 }
 
+void error_handler (char * errMsg)
+{
+        int len = strlen(errMsg);
+        if (writen(ppid, errMsg, len) != len)
+                err_sys("writen error");
+        exit (0);
+}
+
 void str_echoCli(FILE *fp, int sockFD)
 {
         char    recvline[MAXBUF];
@@ -31,59 +39,39 @@ void str_echoCli(FILE *fp, int sockFD)
 		//Select(maxfdp1, &rset, NULL, NULL, NULL);
                 nready = select(maxfdpl + 1, &rset, NULL, NULL, NULL); 
 	        if (nready < 0)
-		        err_sys("select error");
+		        error_handler("select error");
 
 		if (FD_ISSET(sockFD, &rset)) {	/* socket is readable */
 	                n = readline(sockFD, recvline, MAXBUF);
 	                if (n == -1)
-		                err_sys("read error");
+		                error_handler("read error");
 			else if (n == 0) {
 				if (stdineof == 1)
 					return;		/* normal termination */
 				else
-				        err_quit("str_cli: server terminated prematurely");
+				        error_handler("str_cli: server terminated prematurely");
 			}
 	                if (write(fileno(stdout), recvline, n) != n)
-		                err_sys("write error");
+		                error_handler("write error");
 		}
 
 		if (FD_ISSET(fileno(fp), &rset)) {  /* input is readable */
 	                n = readline(fileno(fp), recvline, MAXBUF);
 	                if (n == -1)
-		                err_sys("read error");
+		                error_handler("read error");
 			else if (n == 0) { 
 				stdineof = 1;
 				/* send FIN */
 	                        if (shutdown(sockFD, SHUT_WR) < 0)
-		                        err_sys("shutdown error");
+		                        error_handler("shutdown error");
 				FD_CLR(fileno(fp), &rset);
 				continue;
 			}
 
 	                if (writen(sockFD, recvline, n) != n)
-		                err_sys("writen error");
-			//Writen(sockfd, buf, n);
+		                error_handler("writen error");
 		}
 	}
-/*
-        while ( (ptr = fgets(sendline, MAXBUF, fp)) != NULL) {
-
-                len = strlen(sendline);
-                if (writen(sockfd, sendline, len) != len)
-                        err_sys("writen error");
-
-                if ((n = readline(sockfd, recvline, MAXBUF)) == 0)
-                        err_quit("str_cli: server terminated prematurely");
-                else if (n < 0)
-                        err_sys("readline error");
-
-                if (fputs(recvline, stdout) == EOF)
-                        err_sys("fputs error");
-
-        }
-        if (ptr == NULL && ferror(fp))
-                err_sys("fgets error");
-*/
 }
 
 void start_echoClient(char *ipAddress, int portNum)
@@ -92,17 +80,17 @@ void start_echoClient(char *ipAddress, int portNum)
         char recvBuffer[MAXBUF + 1];
         struct sockaddr_in servAddr;
         if ( (sockFD = socket(AFI, SOCK_STREAM, 0)) < 0)
-                err_sys("socket creation error");
+                error_handler("socket creation error");
 
         bzero(&servAddr, sizeof(servAddr));
         servAddr.sin_family = AFI;
         servAddr.sin_port = htons(portNum);
 
         if (inet_pton(AFI, ipAddress, &servAddr.sin_addr) <= 0)
-                err_quit("inet_pton error for %s", ipAddress);
+                error_handler("inet_pton error");
 
         if (connect(sockFD, (SA *) &servAddr, sizeof(servAddr)) < 0)
-                err_sys("connect error");
+                error_handler("connect error");
 
         /* Check in you have to write an own version of this function . */
         str_echoCli(stdin, sockFD);
@@ -114,7 +102,7 @@ int main(int argc, char **argv)
         struct in_addr ipv4addr;
 
         if (argc < 2)
-                err_quit("./time_cli <IPAddress>");
+                err_quit("./time_cli <IPAddress> <Pipe FileDesc>");
 
         char *ipAddress = argv[1];
         ppid = atoi(argv[2]);
