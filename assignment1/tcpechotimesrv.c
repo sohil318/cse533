@@ -38,12 +38,12 @@ void * timeSrv(void *arg)
 	        if (nready < 0)
 		        err_sys("select error");
                 
-                if (FD_ISSET(connFD, &rset))      {
+                if (nready > 0)      {
 		        n = read(connFD, recvBuffer, MAXBUF);
                         if ( n == -1 )
                 		err_sys("read error");
                         else if (n == 0) {
-                                //printf("\nHere\n");
+                                printf("\nHere\n");
                                 if (close(connFD) == -1)
 		                        err_sys("close error");
 				FD_CLR(connFD, &allset);
