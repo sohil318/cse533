@@ -51,8 +51,6 @@ void start_timeClient(char *ipAddress, int portNum)
 int main(int argc, char **argv)
 {
     //printf("\nHello Sohil");
-    struct hostent *hp;
-    struct in_addr ipv4addr;
     
     if (argc < 2)
             err_quit("./time_cli <IPAddress>");

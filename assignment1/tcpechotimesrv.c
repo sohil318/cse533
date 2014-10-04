@@ -43,7 +43,7 @@ void * timeSrv(void *arg)
                         if ( n == -1 )
                 		err_sys("read error");
                         else if (n == 0) {
-                                printf("\nHere\n");
+           //                     printf("\nHere\n");
                                 if (close(connFD) == -1)
 		                        err_sys("close error");
 				FD_CLR(connFD, &allset);
@@ -63,7 +63,6 @@ void * timeSrv(void *arg)
 
         if (close(connFD) == -1)
                 err_sys("close error");
-        //        }
 
 	//Close(connfd);			/* done with connected socket */
 	return(NULL);
@@ -100,7 +99,6 @@ void * echoSrv(void *arg)
                 err_sys("pthread_detach error");
         }
         
-        //while (1);
         str_echo(connFD);       
         if (close(connFD) == -1)
                 err_sys("close error");
