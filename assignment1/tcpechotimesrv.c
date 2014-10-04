@@ -23,7 +23,6 @@ void * timeSrv(void *arg)
         	errno = n;
 	        err_sys("pthread_detach error");
         }
-        //while (1);
         maxfdpl = connFD;
         FD_ZERO(&allset);
         FD_SET(connFD, &allset);

@@ -1,5 +1,6 @@
 #include "unp.h"
 #define AFI AF_INET
+#define MAXBUF 1024
 
 /*
    Get ip from domain name
@@ -35,7 +36,7 @@ int main(int argc, char **argv)
 {
     struct hostent *hp;
     struct in_addr ipv4addr;
-    char buf[MAXLINE], temp[10];
+    char buf[MAXBUF], temp[10];
     int n;
     int pfd[2];
     pid_t pid;
@@ -58,14 +59,18 @@ int main(int argc, char **argv)
     {
         inet_pton(AFI, ipAddress, &ipv4addr);
         hp = gethostbyaddr(&ipv4addr, sizeof(ipv4addr), AFI);
-        printf("The server host is %s.\n", hp->h_name);
+        printf("The hostname is %s.\n", hp->h_name);
     }
+    printf("\nThe host IP Address= %s", ipAddress);
     
     while (1)
     {
             printf("\n\n1. Echo Client. \n2. Date-Time Client. \n3. Exit Gracefully. \nEnter your choice. (1 - 3) : \t");
-            if (!scanf("%d", &n))
+            if (scanf("%d", &n) != 1)
+            {
+                    fgets(buf, MAXBUF, stdin);
                     printf("\nInvalid Input type.");
+            }
             switch (n) {
                 case 1:
                         if (pipe(pfd) == -1)
