@@ -125,15 +125,16 @@ int serverListen(int portNum)
         servAddr.sin_port = htons(portNum);
         servAddr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-        if (bind(listenSockFD, (SA *) &servAddr, sizeof(servAddr)) < 0)
-                err_sys("bind error");
-
         if(setsockopt(listenSockFD, SOL_SOCKET, SO_REUSEADDR,(char*)&option, sizeof(option)) < 0)
         {
                 printf("setsockopt failed\n");
                 close(listenSockFD);
                 exit(2);
         }
+        
+	if (bind(listenSockFD, (SA *) &servAddr, sizeof(servAddr)) < 0)
+                err_sys("bind error");
+
 
 
         backlog = LISTENQ;

@@ -70,6 +70,7 @@ int main(int argc, char **argv)
             {
                     fgets(buf, MAXBUF, stdin);
                     printf("\nInvalid Input type.");
+		    continue;	
             }
             switch (n) {
                 case 1:
