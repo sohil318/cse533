@@ -24,12 +24,12 @@
 
 CC = gcc
 
-LIBS = -lresolv -lnsl -lpthread\
-	/home/stufs1/sogandhi/cse533/Stevens/libunp.a\
+LIBS = -lresolv -lnsl -lpthread -lsocket\
+	/home/courses/cse533/Stevens/unpv13e_solaris2.10/libunp.a
 	
 FLAGS = -g -O2
 
-CFLAGS = ${FLAGS} -I/home/stufs1/sogandhi/cse533/Stevens/lib
+CFLAGS = ${FLAGS} -I/home/courses/cse533/Stevens/unpv13e_solaris2.10/lib
 
 all: client server echo_cli echo_srv time_cli time_srv
 
@@ -70,9 +70,8 @@ tcpechotimecli.o: tcpechotimecli.c
 
 # pick up the thread-safe version of readline.c from directory "threads"
 
-readline.o: /home/stufs1/sogandhi/cse533/Stevens/threads/readline.c
-	${CC} ${CFLAGS} -c /home/stufs1/sogandhi/cse533/Stevens/threads/readline.c
-
+readline.o: /home/courses/cse533/Stevens/unpv13e_solaris2.10/threads/readline.c
+	${CC} ${CFLAGS} -c /home/courses/cse533/Stevens/unpv13e_solaris2.10/threads/readline.c
 
 clean:
 	rm echo_cli echo_cli.o echo_srv echo_srv.o server tcpechotimesrv.o client tcpechotimecli.o time_cli time_cli.o time_srv time_srv.o readline.o
