@@ -76,9 +76,9 @@ str_echoSrv(int sockFD)
 	char buff[MAXBUF];
 
 again:
-	while ( (nbytes = read(sockFD, buff, MAXBUF)) > 0)
+	while ( (nbytes = Readline(sockFD, buff, MAXBUF)) > 0)
         {
-                printf ("\nServer Data : %s", buff);
+                //printf ("\nServer Data : %s", buff);
 	        if (writen(sockFD, buff, nbytes) != nbytes)
 		        err_sys("writen error");
         }
@@ -100,7 +100,7 @@ void * echoSrv(void *arg)
                 err_sys("pthread_detach error");
         }
         
-        str_echo(connFD);       
+        str_echoSrv(connFD);       
         if (close(connFD) == -1)
                 err_sys("close error");
 

@@ -36,10 +36,11 @@ int main(int argc, char **argv)
 {
     struct hostent *hp;
     struct in_addr ipv4addr;
-    char buf[MAXBUF], temp[10];
-    int n;
+    char buf[MAXBUF], temp[10], strbuf[MAXBUF];
     int pfd[2];
     pid_t pid;
+    int     len, n, maxfdpl, stdineof = 0, nready;
+    fd_set  rset;
 
     if (argc != 2)
             err_quit("./client <IPAddress>");
@@ -91,23 +92,42 @@ int main(int argc, char **argv)
                         {
                                 //printf("Enter parent client");
                                 close(pfd[1]);
-                                n = read(pfd[0], buf, 1024);
-		                if (n == -1)
-                                        err_sys("read error");
-                                else {
-                                        buf[n] = '\0';
-                                        if ( n == 0 )
-                                        {
-                                                printf ("\nEcho Child Terminated !!!\n");
-                                                wait(NULL);
+                                FD_ZERO(&rset);
+                                for ( ; ; ) {
+                                        FD_SET(fileno(stdin), &rset);
+                                        FD_SET(pfd[0], &rset);
+                                        maxfdpl = max(fileno(stdin), pfd[0]);
+                                        //Select(maxfdp1, &rset, NULL, NULL, NULL);
+                                        nready = select(maxfdpl + 1, &rset, NULL, NULL, NULL); 
+                                        if (nready < 0)
+                                                err_sys("select error");
+
+                                        if (FD_ISSET(pfd[0], &rset)) {	/* socket is readable */
+                                                n = read(pfd[0], buf, 1024);
+                                                if (n == -1)
+                                                        err_sys("read error");
+                                                else {
+                                                        buf[n] = '\0';
+                                                        if ( n == 0 )
+                                                        {
+                                                                printf ("\nEcho Child Terminated !!!\n");
+                                                                wait(NULL);
+                                                        }
+                                                        else if (strcmp(buf, "DONE") == 0)
+                                                        {
+                                                                printf ("\nEcho Forked Child Terminated !!!\n");
+                                                                wait(NULL);
+                                                        }
+                                                        else
+                                                                printf ("\nPipe Message from Echo Client : %s\n", buf);
+                                                }
+                                                break;
                                         }
-                                        else if (strcmp(buf, "DONE") == 0)
-                                        {
-                                                printf ("\nEcho Forked Child Terminated !!!\n");
-                                                wait(NULL);
+
+                                        if (FD_ISSET(fileno(stdin), &rset)) {  /* input is readable */
+                                                fgets(strbuf, MAXBUF, stdin);
+                                                printf("\nPlease type on the XTerm Window.\n");
                                         }
-                                        else
-                                                printf ("\nPipe Message from Echo Client : %s\n", buf);
                                 }
                                 close(pfd[0]);
                         }
@@ -130,24 +150,45 @@ int main(int argc, char **argv)
                         {
                                 //printf("Enter parent client");
                                 close(pfd[1]);
-                                n = read(pfd[0], buf, 1024);
-                                if (n == -1)
-                                        err_sys("read error");
-                                else {
-                                        buf[n] = '\0';
-                                        if ( n == 0 )
-                                        {
-                                                printf ("\nTime Child Terminated !!!\n");
-                                                wait(NULL);
+
+                                FD_ZERO(&rset);
+                                for ( ; ; ) {
+                                        FD_SET(fileno(stdin), &rset);
+                                        FD_SET(pfd[0], &rset);
+                                        maxfdpl = max(fileno(stdin), pfd[0]);
+                                        //Select(maxfdp1, &rset, NULL, NULL, NULL);
+                                        nready = select(maxfdpl + 1, &rset, NULL, NULL, NULL); 
+                                        if (nready < 0)
+                                                err_sys("select error");
+
+                                        if (FD_ISSET(pfd[0], &rset)) {	/* socket is readable */
+                                                n = read(pfd[0], buf, 1024);
+                                                if (n == -1)
+                                                        err_sys("read error");
+                                                else {
+                                                        buf[n] = '\0';
+                                                        if ( n == 0 )
+                                                        {
+                                                                printf ("\nTime Child Terminated !!!\n");
+                                                                wait(NULL);
+                                                        }
+                                                        else if (strcmp(buf, "DONE") == 0)
+                                                        {
+                                                                printf ("\nTime Forked Child Terminated !!!\n");
+                                                                wait(NULL);
+                                                        }
+                                                        else
+                                                                printf ("\nPipe Message from Time Client : %s\n", buf);
+                                                }
+                                                break;
                                         }
-                                        else if (strcmp(buf, "DONE") == 0)
-                                        {
-                                                printf ("\nTime Forked Child Terminated !!!\n");
-                                                wait(NULL);
+
+                                        if (FD_ISSET(fileno(stdin), &rset)) {  /* input is readable */
+                                                fgets(strbuf, MAXBUF, stdin);
+                                                printf("\nPlease type on the XTerm Window.\n");
                                         }
-                                        else
-                                                printf ("\nPipe Message from Time Client : %s\n", buf);
                                 }
+
                                 close(pfd[0]);
                         }
                         break;
