@@ -1,10 +1,11 @@
 
 CC = gcc
 
-LIBS = /home/stufs1/sogandhi/cse533/Stevens/libunp.a
+LIBS =  -lsocket\
+	/home/courses/cse533/Stevens/unpv13e_solaris2.10/libunp.a
 
 FLAGS =  -g -O2
-CFLAGS = ${FLAGS} -I/home/stufs1/sogandhi/cse533/Stevens/lib
+CFLAGS = ${FLAGS} -I/home/courses/cse533/Stevens/unpv13e_solaris2.10/lib
 
 all: udpserv03.o 
 	${CC} -o prifinfo_plus udpserv03.o ${LIBS}
