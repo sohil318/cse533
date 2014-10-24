@@ -12,17 +12,14 @@ LIBS = -lresolv -lnsl -lpthread\
 FLAGS =  -g -O2
 CFLAGS = ${FLAGS} -I${HOME}/lib -I${ASSGN2}/
 
-all: get_ifi_info_plus.o udpserv03.o
-	${CC} -o interfaceTest get_ifi_info_plus.o udpserv03.o ${LIBS}
+all: get_ifi_info_plus.o utils.o
+	${CC} -o interfaceTest get_ifi_info_plus.o utils.o ${LIBS}
 
-udpserv03.o: udpserv03.c 
-	${CC} ${CFLAGS} -c udpserv03.c
+utils.o: utils.c 
+	${CC} ${CFLAGS} -c utils.c
 
 get_ifi_info_plus.o: ${ASSGN2}/get_ifi_info_plus.c
 	${CC} ${CFLAGS} -c ${ASSGN2}/get_ifi_info_plus.c
 
-#prifinfo_plus.o: ${ASSGN2}/prifinfo_plus.c
-#	${CC} ${CFLAGS} -c ${ASSGN2}/prifinfo_plus.c
-
 clean:
-	rm interfaceTest get_ifi_info_plus.o udpserv03.o
+	rm interfaceTest get_ifi_info_plus.o utils.o
