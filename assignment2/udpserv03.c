@@ -13,7 +13,9 @@ main(int argc, char **argv)
 		 ifi != NULL; ifi = ifi->ifi_next) {
 
 			/*4bind unicast address */
-		if (!(ifi->ifi_flags & IFF_BROADCAST)) {
+		if (ifi->ifi_flags & IFF_BROADCAST) {
+                        continue;
+                }
 		        sockfd = Socket(AF_INET, SOCK_DGRAM, 0);
 
 		        Setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
@@ -24,7 +26,6 @@ main(int argc, char **argv)
 		        Bind(sockfd, (SA *) sa, sizeof(*sa));
 		        printf("bound %s\n", Sock_ntop((SA *) sa, sizeof(*sa)));
 		
-                }
 	}
 	return 0;
 }
