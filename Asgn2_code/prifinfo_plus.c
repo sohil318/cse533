@@ -5,7 +5,7 @@ extern        void      free_ifi_info_plus(struct ifi_info *ifihead);
 
 
 int
-main(int argc, char **argv)
+main1(int argc, char **argv)
 {
 	struct ifi_info	*ifi, *ifihead;
 	struct sockaddr	*sa;
