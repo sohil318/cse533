@@ -1,4 +1,4 @@
-#include	"unpifi.h"
+#include	"unpifiplus.h"
 
 int
 main(int argc, char **argv)
@@ -9,7 +9,7 @@ main(int argc, char **argv)
 	struct ifi_info		*ifi, *ifihead;
 	struct sockaddr_in	*sa, cliaddr, wildaddr;
 
-	for (ifihead = ifi = Get_ifi_info(AF_INET, 1);
+	for (ifihead = ifi = Get_ifi_info_plus(AF_INET, 1);
 		 ifi != NULL; ifi = ifi->ifi_next) {
 
 			/*4bind unicast address */
