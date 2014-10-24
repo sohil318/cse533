@@ -5,17 +5,18 @@
 #include	<net/if.h>
 
 /* Linklist of Interfaces */
-struct interfaceInfo {
+typedef struct InterfaceInfo {
 	int			sockfd;                 /* socket file descriptor       */
         int                     mask;                   /* Subnet mask bits             */
-        struct sockaddr         *ifi_addr;	        /* primary address              */
-        struct sockaddr         *ifi_ntmaddr;           /* netmask address              */
-        struct sockaddr         *ifi_subnetAddr;        /* subnet address               */
-        struct interfacesInfo   *ifi_next;	        /* next of these structures     */
-};
+        struct sockaddr_in      ifi_addr;	        /* primary address              */
+        struct sockaddr_in      ifi_ntmaddr;		/* netmask address              */
+        struct sockaddr_in      ifi_subnetAddr;		/* subnet address               */
+        struct InterfacesInfo   *ifi_next;	        /* next of these structures     */
+}interfaceInfo;
 
 /* function prototypes */
-struct interfaceInfo* loadInterfaces();
+interfaceInfo* get_interfaces_client();
+interfaceInfo* get_interfaces_server(int portno);
 void   loadContents(int type);
 
 #endif	/* __utils_h */

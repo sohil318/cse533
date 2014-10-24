@@ -1,56 +1,80 @@
 #include        "utils.h"
 #include	"unpifiplus.h"
 
-struct interfaceInfo* loadInterfaces()
+interfaceInfo* get_interfaces_client()
 {
-	struct ifi_info	*ifi, *ifihead;
-	struct sockaddr	*sa;
-	u_char		*ptr;
-	int		i, family, doaliases;
+	interfaceInfo		*head = NULL, *temp;
+	struct ifi_info		*ifi, *ifihead;
+	struct sockaddr_in	*sa, *netmask;
+	int sockfd;
+
 
 	for (ifihead = ifi = Get_ifi_info_plus(AF_INET, 1);
 		 ifi != NULL; ifi = ifi->ifi_next) {
+		
+		temp = (interfaceInfo *)malloc(sizeof(interfaceInfo));
+
 		printf("%s: ", ifi->ifi_name);
 		if (ifi->ifi_index != 0)
 			printf("(%d) ", ifi->ifi_index);
-		printf("<");
-/* *INDENT-OFF* */
-		if (ifi->ifi_flags & IFF_UP)			printf("UP ");
-		if (ifi->ifi_flags & IFF_BROADCAST)		printf("BCAST ");
-		if (ifi->ifi_flags & IFF_MULTICAST)		printf("MCAST ");
-		if (ifi->ifi_flags & IFF_LOOPBACK)		printf("LOOP ");
-		if (ifi->ifi_flags & IFF_POINTOPOINT)	printf("P2P ");
-		printf(">\n");
-/* *INDENT-ON* */
 
-		if ( (i = ifi->ifi_hlen) > 0) {
-			ptr = ifi->ifi_haddr;
-			do {
-				printf("%s%x", (i == ifi->ifi_hlen) ? "  " : ":", *ptr++);
-			} while (--i > 0);
-			printf("\n");
-		}
-		if (ifi->ifi_mtu != 0)
-			printf("  MTU: %d\n", ifi->ifi_mtu);
+		printf("\n");
+		
+		if ( (sa = (struct sockaddr_in *)ifi->ifi_addr) != NULL)
+		    memcpy(&temp->ifi_addr,sa,sizeof(struct sockaddr_in));
+//		    printf("  IP addr: %s\n", Sock_ntop_host(sa, sizeof(*sa)));
 
-		if ( (sa = ifi->ifi_addr) != NULL)
-			printf("  IP addr: %s\n",
-						Sock_ntop_host(sa, sizeof(*sa)));
 
-/*=================== cse 533 Assignment 2 modifications ======================*/
+		if ( (netmask = (struct sockaddr_in *)ifi->ifi_ntmaddr) != NULL)
+		    memcpy(&temp->ifi_ntmaddr, netmask,sizeof(struct sockaddr_in));
+//			printf("  network mask: %s\n", Sock_ntop_host(sa, sizeof(*sa)));
 
-		if ( (sa = ifi->ifi_ntmaddr) != NULL)
-			printf("  network mask: %s\n",
-						Sock_ntop_host(sa, sizeof(*sa)));
+		temp->ifi_next = head;
+		head = temp;
+	}
+	free_ifi_info_plus(ifihead);
+	return head;
+}
+
+interfaceInfo* get_interfaces_server(int portno)
+{
+	interfaceInfo		*head = NULL, *temp;
+	struct ifi_info		*ifi, *ifihead;
+	struct sockaddr_in	*sa, *netmask;
+	u_char			*ptr;
+	int sockfd;
+
+
+	for (ifihead = ifi = Get_ifi_info_plus(AF_INET, 1);
+		 ifi != NULL; ifi = ifi->ifi_next) {
+		
+		temp = (interfaceInfo *)malloc(sizeof(interfaceInfo));
+
+		printf("%s: ", ifi->ifi_name);
+		if (ifi->ifi_index != 0)
+			printf("(%d) ", ifi->ifi_index);
+
+		printf("\n");
+		
+		if ( (sa = (struct sockaddr_in *)ifi->ifi_addr) != NULL)
+		    memcpy(&temp->ifi_addr,sa,sizeof(struct sockaddr_in));
+
+		if ( (netmask = (struct sockaddr_in *)ifi->ifi_ntmaddr) != NULL)
+		    memcpy(&temp->ifi_ntmaddr, netmask,sizeof(struct sockaddr_in));
 
 /*=============================================================================*/
 
-		if ( (sa = ifi->ifi_brdaddr) != NULL)
-			printf("  broadcast addr: %s\n",
-						Sock_ntop_host(sa, sizeof(*sa)));
-		if ( (sa = ifi->ifi_dstaddr) != NULL)
-			printf("  destination addr: %s\n",
-						Sock_ntop_host(sa, sizeof(*sa)));
+/*
+		sockfd = Socket(AF_INET, SOCK_DGRAM, 0);
+		Setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+
+		sa = (struct sockaddr_in *) ifi->ifi_addr;
+		sa->sin_family = AF_INET;
+		sa->sin_port = htons(SERV_PORT);
+		Bind(sockfd, (SA *) sa, sizeof(*sa));
+*/		
+		temp->ifi_next = head;
+		head = temp;
 	}
 	free_ifi_info_plus(ifihead);
 	exit(0);
@@ -81,7 +105,7 @@ main(int argc, char **argv)
 	
 	}
 */
-        loadInterfaces();
+        get_interfaces_client();
         return 0;
 }
 
