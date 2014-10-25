@@ -109,3 +109,65 @@ main(int argc, char **argv)
         return 0;
 }
 
+void loadContents(int type){
+	FILE *input;
+	int line = 1;
+	char temp[50];
+	if(type==1){
+		input = fopen("server.in","r");
+		bzero(servInfo,sizeof(servStruct));
+		if (input == NULL){
+			printf("Error in reading the file server.in");
+			return;
+		}
+		fscanf(input, "%s", temp);
+               	servInfo->serv_portNum = atoi(temp);
+			
+		fscanf(input, "%s", temp);
+		servInfo->send_Window = atoi(temp);
+
+		servInfo->ifi_head = get_interfaces_server(servInfo->serv_portNum);
+		printf("SERVER PARAMETERS:\n");
+                printf("server port: %ld\n", servInfo->serv_portNum);
+                printf("max sending sliding window size: %d\n", servInfo->send_Window);
+	}
+	if(type==2){
+		input = fopen("client.in","r");
+		if (input == NULL){
+                        printf("Error in reading the file client.in");
+                        return;
+                }
+		bzero(clientInfo, sizeof(clientStruct));
+                fscanf(input, "%s", temp);
+		clientInfo->serv_addr.sin_addr.s_addr = atof(temp) ;
+
+		fscanf(input, "%s", temp);
+		clientInfo->serv_portNum = atoi(temp);	
+
+		fscanf(input, "%s", temp);
+                clientInfo->fileName = temp;
+
+		fscanf(input, "%s", temp);
+                clientInfo->rec_Window = atoi(temp);
+	
+		fscanf(input, "%s", temp);
+                clientInfo->seed = atoi(temp);
+	
+		fscanf(input, "%s", temp);
+                clientInfo->dg_lossProb = atof(temp);
+
+                fscanf(input, "%s", temp);
+                clientInfo->recv_rate = atoi(temp);
+
+		clientInfo->ifi_head = get_interfaces_client();
+
+		printf("CLIENT PARAMETERS:\n");	
+    		printf("server ip: %ld\n", clientInfo->serv_addr.sin_addr.s_addr);
+    		printf("server port: %d\n", clientInfo->serv_portNum);
+    		printf("filename: %s\n", clientInfo->fileName);
+    		printf("recieving sliding window size: %d\n", clientInfo->rec_Window);
+    		printf("seed value: %d\n", clientInfo->seed);
+    		printf("datagram loss probability: %f\n", clientInfo->dg_lossProb);
+    		printf("mean receive rate (ms): %d\n", clientInfo->recv_rate);
+	}
+}
