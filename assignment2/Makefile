@@ -1,18 +1,18 @@
 CC = gcc
 
 #### Params for sohil sbrocks #### 
-#HOME=/home/stufs1/sogandhi/cse533/Stevens
-#ASSGN2=/home/stufs1/sogandhi/cse533/Asgn2_code
+HOME=/home/stufs1/sogandhi/cse533/Stevens
+ASSGN2=/home/stufs1/sogandhi/cse533/Asgn2_code
 
 #### Params for compserv #### 
-HOME=/home/courses/cse533/Stevens/unpv13e_solaris2.10
-ASSGN2=/home/courses/cse533/Asgn2_code
+#HOME=/home/courses/cse533/Stevens/unpv13e_solaris2.10
+#ASSGN2=/home/courses/cse533/Asgn2_code
 
 #### Params for shipra sbrocks #### 
 #HOME=/home/stufs1/shipgupta/cse533/Stevens/
 #ASSGN2=/home/stufs1/shipgupta/cse533/Asgn2_code
 
-LIBS = -lresolv -lnsl -lsocket -lpthread\
+LIBS = -lresolv -lnsl -lpthread\
 	${HOME}/libunp.a\
 
 FLAGS =  -g -O2

@@ -21,22 +21,24 @@ typedef struct servStruct {
 } servStruct;
 
 typedef struct clientStruct {
-	struct sockaddr_in 	serv_addr;		/* IP address of server		*/
-	int 			serv_portNum;		/* Server port number		*/
-	char 			*fileName; 		/* Filename to be transferred	*/
-	int 			rec_Window;		/* Recievingsliding window size */
-	int 			seed;			/* Random generator seed value 	*/
-	float 			dg_lossProb; 		/* Datagram loss probability    */
-	int 			recv_rate; 		/* mean rate in ms				*/
-	struct InterfaceInfo 	*ifi_head;		/* head of interface linklist   */	 
+	struct sockaddr_in 	serv_addr;		/* IP address of server		 */
+	int 			serv_portNum;		/* Server port number		 */
+	char 			*fileName; 		/* Filename to be transferred	 */
+	int 			rec_Window;		/* Recieving sliding window size */
+	int 			seed;			/* Random generator seed value 	 */
+	float 			dg_lossProb; 		/* Datagram loss probability     */
+	int 			recv_rate; 		/* mean rate in ms		 */
+	struct InterfaceInfo 	*ifi_head;		/* head of interface linklist    */	 
 } clientStruct;
 
 clientStruct *clientInfo;
 servStruct *servInfo;
 
 /* function prototypes */
-interfaceInfo* get_interfaces_client();
-interfaceInfo* get_interfaces_server(int portno);
+interfaceInfo * get_interfaces_client();
+interfaceInfo * get_interfaces_server(int portno);
+interfaceInfo * loadServerInfo();
+interfaceInfo * loadClientInfo();
 void   loadContents(int type);
 
 #endif	/* __utils_h */

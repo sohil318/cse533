@@ -9,6 +9,10 @@ interfaceInfo* get_interfaces_client()
 	int sockfd;
 	char src[128], dst[128];
 
+	printf("\n ========================== CLIENT INTERFACES INFO =============================");
+	printf("\n ======= Interface_Name    IP_Address    Subnet_Mask    Subnet_Address   =======");
+	printf("\n ===============================================================================");
+	printf("\n ||                                                                           ||");
 	for (ifihead = ifi = Get_ifi_info_plus(AF_INET, 1);
 		 ifi != NULL; ifi = ifi->ifi_next) {
 		
@@ -34,15 +38,18 @@ interfaceInfo* get_interfaces_client()
 		temp->ifi_next = head;
 		head = temp;
 
-		printf("\n\n%s: \n", ifi->ifi_name);
-		inet_ntop(AF_INET, &temp->ifi_addr.sin_addr, src, sizeof(src));
-		printf("  IP addr: %s\n",	src);
-		inet_ntop(AF_INET, &temp->ifi_ntmaddr.sin_addr, src, sizeof(src));
-		printf("  Subnet Mask: %s\n",	src);
-		inet_ntop(AF_INET, &temp->ifi_subnetaddr.sin_addr, src, sizeof(src));
-		printf("  Subnet Addr: %s\n",	src);
+                printf("\n ||        \t%s     ", ifi->ifi_name);
+                inet_ntop(AF_INET, &temp->ifi_addr.sin_addr, src, sizeof(src));
+                printf("\t %s",	src);
+                inet_ntop(AF_INET, &temp->ifi_ntmaddr.sin_addr, src, sizeof(src));
+                printf("\t%s",	src);
+                inet_ntop(AF_INET, &temp->ifi_subnetaddr.sin_addr, src, sizeof(src));
+                printf("\t %s\t      ||",	src);
 		
 	}
+	printf("\n ||                                                                           ||");
+	printf("\n ===============================================================================");
+
 	free_ifi_info_plus(ifihead);
 	return head;
 
@@ -57,7 +64,11 @@ interfaceInfo* get_interfaces_server(int portno)
 	int sockfd;
 	char src[128], dst[128];
 
-	for (ifihead = ifi = Get_ifi_info_plus(AF_INET, 1);
+	printf("\n ================================= SERVER INTERFACES INFO ===============================");
+	printf("\n ======= Interface_Name    IP_Address    Subnet_Mask    Subnet_Address     SockFD =======");
+	printf("\n ========================================================================================");
+	printf("\n ||                                                                                    ||");
+        for (ifihead = ifi = Get_ifi_info_plus(AF_INET, 1);
 		 ifi != NULL; ifi = ifi->ifi_next) {
 		
 		temp = (interfaceInfo *)malloc(sizeof(interfaceInfo));
@@ -92,17 +103,21 @@ interfaceInfo* get_interfaces_server(int portno)
 		    temp->ifi_next  = head;
 		    head = temp;
 		    
-		    printf("\n\n%s: \n", ifi->ifi_name);
-		    printf("  Socket FD: %d\n",   temp->sockfd);
+		    printf("\n ||         \t%s     ", ifi->ifi_name);
 		    inet_ntop(AF_INET, &temp->ifi_addr.sin_addr, src, sizeof(src));
-		    printf("  IP addr: %s\n",	src);
+		    printf("\t %s",	src);
 		    inet_ntop(AF_INET, &temp->ifi_ntmaddr.sin_addr, src, sizeof(src));
-		    printf("  Subnet Mask: %s\n",	src);
+		    printf("\t %s",	src);
 		    inet_ntop(AF_INET, &temp->ifi_subnetaddr.sin_addr, src, sizeof(src));
-		    printf("  Subnet Addr: %s\n",	src);
+		    printf("\t %s",	src);
+		    
+                    printf("\t     %d\t       ||",   temp->sockfd);
 		}
-		
 	}
+	printf("\n ||                                                                                    ||");
+	printf("\n ========================================================================================\n");
+
+
 	free_ifi_info_plus(ifihead);
 	return head;
 
@@ -114,84 +129,98 @@ main(int argc, char **argv)
 {
 	interfaceInfo		*head = NULL, *temp;
         int count = 0;
-        head = get_interfaces_client();
+        head = loadClientInfo();
 	while (head)
 	{
 	    count++;
 	    head = head->ifi_next;
 	}
-	printf ("Count = %d \n", count);
+	//printf ("Count = %d \n", count);
         count = 0;
-	head = get_interfaces_server(5003);
+	head = loadServerInfo();
 	while (head)
 	{
 	    count++;
 	    head = head->ifi_next;
 	}
-	printf ("Count = %d \n", count);
+	//printf ("Count = %d \n", count);
 	//loadContents(1);
         return 0;
 }
 
-void loadContents(int type){
+interfaceInfo * loadServerInfo()
+{
+        FILE *input;
+        char temp[50];
+        input = fopen("server.in","r");
+        servInfo = (servStruct *)calloc(1, sizeof(servStruct));
+        if (input == NULL){
+                printf("Error in reading the file server.in");
+                return;
+        }
+        fscanf(input, "%s", temp);
+        servInfo->serv_portNum = atoi(temp);
+
+        fscanf(input, "%s", temp);
+        servInfo->send_Window = atoi(temp);
+
+        printf("\n ============================================================== ");
+        printf("\n                      SERVER PARAMETERS                         ");
+        printf("\n ============================================================== ");
+        printf("\n | server port                        :       %ld            |", servInfo->serv_portNum);
+        printf("\n | max sending sliding window size    :       %d              |", servInfo->send_Window);
+        printf("\n ============================================================== \n");
+        servInfo->ifi_head = get_interfaces_server(servInfo->serv_portNum);
+
+        return servInfo->ifi_head;
+}
+
+
+interfaceInfo * loadClientInfo()
+{
 	FILE *input;
 	char temp[50];
-	if(type==1){
-		input = fopen("server.in","r");
-		servInfo = (servStruct*)calloc(1,sizeof(servStruct));
-		if (input == NULL){
-			printf("Error in reading the file server.in");
-			return;
-		}
-		fscanf(input, "%s", temp);
-	       	servInfo->serv_portNum = atoi(temp);
-		
-		fscanf(input, "%s", temp);
-		servInfo->send_Window = atoi(temp);
+        input = fopen("client.in","r");
+        if (input == NULL){
+                printf("Error in reading the file client.in");
+                return;
+        }
+        
+        clientInfo = (clientStruct*)calloc(1,sizeof(clientStruct));
+        fscanf(input, "%s", temp);
+        clientInfo->serv_addr.sin_addr.s_addr = atof(temp) ;
 
-		servInfo->ifi_head = get_interfaces_server(servInfo->serv_portNum);
-		
-		printf("SERVER PARAMETERS:\n");
-                printf("server port: %ld\n", servInfo->serv_portNum);
-                printf("max sending sliding window size: %d\n", servInfo->send_Window);
-	}
-	if(type==2){
-		input = fopen("client.in","r");
-		if (input == NULL){
-                        printf("Error in reading the file client.in");
-                        return;
-                }
-		clientInfo = (clientStruct*)calloc(1,sizeof(clientStruct));
-                fscanf(input, "%s", temp);
-		clientInfo->serv_addr.sin_addr.s_addr = atof(temp) ;
+        fscanf(input, "%s", temp);
+        clientInfo->serv_portNum = atoi(temp);	
 
-		fscanf(input, "%s", temp);
-		clientInfo->serv_portNum = atoi(temp);	
+        fscanf(input, "%s", temp);
+        clientInfo->fileName = temp;
 
-		fscanf(input, "%s", temp);
-                clientInfo->fileName = temp;
+        fscanf(input, "%s", temp);
+        clientInfo->rec_Window = atoi(temp);
 
-		fscanf(input, "%s", temp);
-                clientInfo->rec_Window = atoi(temp);
-	
-		fscanf(input, "%s", temp);
-                clientInfo->seed = atoi(temp);
-	
-		fscanf(input, "%s", temp);
-                clientInfo->dg_lossProb = atof(temp);
+        fscanf(input, "%s", temp);
+        clientInfo->seed = atoi(temp);
 
-                fscanf(input, "%s", temp);
-                clientInfo->recv_rate = atoi(temp);
+        fscanf(input, "%s", temp);
+        clientInfo->dg_lossProb = atof(temp);
 
-		clientInfo->ifi_head = get_interfaces_client();
+        fscanf(input, "%s", temp);
+        clientInfo->recv_rate = atoi(temp);
 
-		printf("CLIENT PARAMETERS:\n");	
-    		printf("server ip: %ld\n", clientInfo->serv_addr.sin_addr.s_addr);
-    		printf("server port: %d\n", clientInfo->serv_portNum);
-    		printf("filename: %s\n", clientInfo->fileName);
-    		printf("recieving sliding window size: %d\n", clientInfo->rec_Window);
-    		printf("seed value: %d\n", clientInfo->seed);
-    		printf("datagram loss probability: %f\n", clientInfo->dg_lossProb);
-    		printf("mean receive rate (ms): %d\n", clientInfo->recv_rate);
-	}
+        printf("\n ============================================================== ");
+        printf("\n                      CLIENT PARAMETERS                         ");
+        printf("\n ============================================================== ");
+        printf("\n |    server ip                       :       %ld     |", clientInfo->serv_addr.sin_addr.s_addr);
+        printf("\n |    server port                     :       %d            |", clientInfo->serv_portNum);
+        printf("\n |    filename                        :       %s      |", clientInfo->fileName);
+        printf("\n |    recieving sliding window size   :       %d              |", clientInfo->rec_Window);
+        printf("\n |    seed value                      :       %d               |", clientInfo->seed);
+        printf("\n |    datagram loss probability       :       %f       |", clientInfo->dg_lossProb);
+        printf("\n |    mean receive rate (ms)          :       %d             |", clientInfo->recv_rate);
+        printf("\n ============================================================== \n");
+        
+        clientInfo->ifi_head = get_interfaces_client();
+        
+        return clientInfo->ifi_head;
 }
