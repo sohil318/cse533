@@ -2,7 +2,7 @@
 
 int main(int argc, char **argv)
 {	
-	int 	maxfdpl = -1, nready;
+	int 	maxfdpl = -1, nready, pid;
 	fd_set rset, allset;
 	struct sockaddr_in client_addr;
 	char msg[MAXLINE];
@@ -35,20 +35,38 @@ int main(int argc, char **argv)
 			}
 		}
 		head = interface_list;
-		/*
 		while (head!=NULL) {
 			if(FD_ISSET(head->sockfd, &allset)) {
 				recvfrom(head->sockfd, msg, MAXLINE, 0, (struct sockaddr*)&client_addr, &len);
 				printf("\nClient Address %s: \n", client_addr );
+				// if(already_existing_connection) printf("duplicate connection");
+				//else add to the existing conn ds
+				pid = fork();
+				if(pid==0){
+					child_client(head->sockfd, &interface_list);
+				}
 			}
 			head = head->ifi_next;
-		}*/
+		}
 
 	}
 
 
 
 }
+
+void child_client(int sock, struct InterfaceInfo *head){
+	// Close other sockets except for the one 
+	while(head!=NULL){
+		if(head->sockfd==sock){
+
+		}
+		else{
+			close(head->sockfd);
+		}
+	}
+}
+
 
 int existing_connection(){
 	return 0;
