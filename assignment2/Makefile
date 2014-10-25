@@ -18,12 +18,17 @@ LIBS = -lresolv -lnsl -lpthread\
 FLAGS =  -g -O2
 CFLAGS = ${FLAGS} -I${HOME}/lib -I${ASSGN2}/
 
-all: server
+all: server client
 
 server: server.o utils.o get_ifi_info_plus.o
 	${CC} -o server server.o get_ifi_info_plus.o utils.o ${LIBS}
 server.o: server.c
 	${CC} ${CFLAGS} -c server.c
+
+client: client.o utils.o get_ifi_info_plus.o
+	${CC} -o client client.o get_ifi_info_plus.o utils.o ${LIBS}
+client.o: client.c
+	${CC} ${CFLAGS} -c client.c
 
 utils.o: utils.c 
 	${CC} ${CFLAGS} -c utils.c
@@ -32,5 +37,5 @@ get_ifi_info_plus.o: ${ASSGN2}/get_ifi_info_plus.c
 	${CC} ${CFLAGS} -c ${ASSGN2}/get_ifi_info_plus.c
 
 clean:
-	rm server server.o get_ifi_info_plus.o utils.o
+	rm client server server.o get_ifi_info_plus.o utils.o client.o
 

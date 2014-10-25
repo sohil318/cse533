@@ -1,47 +1,43 @@
 #include	 "utils.h"
 
-int main(int argc, char **argv)
-{	
-	struct InterfaceInfo *interface_list = loadClientInfo();
-	struct InterfaceInfo *head = interface_list;
+#define LOOPBACK "127.0.0.1"
 
-	while (head!=NULL) {
-		printf("\nWaiting for hfksdfhJselect");
-		maxfdpl = max (maxfdpl, head->sockfd);
-		FD_SET(head->sockfd, &allset);
-		head = head->ifi_next;
-	}
-	printf("\niOutWaiting for hfksdfhJselect");
-	
-	for (;;) {
-		printf("\njhwewWaiting for select");
-		rset = allset;
-		printf("\nWaiting for select");
-		if ( (nready = select(maxfdpl+1, &rset, NULL, NULL, &t) ) <2 ) {
-			if (errno == EINTR ) {
-				continue;
-			}
-			else {
-				err_sys("error in select");
-			}
-		}
-		head = interface_list;
-		/*
-		while (head!=NULL) {
-			if(FD_ISSET(head->sockfd, &allset)) {
-				recvfrom(head->sockfd, msg, MAXLINE, 0, (struct sockaddr*)&client_addr, &len);
-				printf("\nClient Address %s: \n", client_addr );
-			}
-			head = head->ifi_next;
-		}*/
+/* 
+ * Function to check if client and server have same host network. 
+ */
 
-	}
+int checkLocal (struct clientStruct **cliInfo)
+{
+        int isLocal;  
+        struct sockaddr_in sa;
+        struct clientStruct *temp = *cliInfo;
+        struct InterfaceInfo *head = temp->ifi_head;
+        char src[128];
 
+        inet_ntop(AF_INET, &temp->serv_addr.sin_addr, src, sizeof(src));
+        if (strcmp(src, LOOPBACK) == 0)
+        {
+                printf ("\nServer IP is Loopback Address. Client IP = 127.0.0.1");
+                temp->cli_addr = temp->serv_addr;
+                return 1;
+        }
+        /*
+        while (head)
+        {
+                        
+        }
+        */
 
+        return 0;
 
 }
 
-int existing_connection(){
-	return 0;
+int main(int argc, char **argv)
+{	
+	struct clientStruct *clientInfo = loadClientInfo();
+        
+        if (clientInfo)
+                checkLocal(&clientInfo);
+        
 }
 

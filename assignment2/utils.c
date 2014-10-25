@@ -181,6 +181,7 @@ servStruct * loadServerInfo()
 clientStruct * loadClientInfo()
 {
 	clientStruct *clientInfo;
+	char src[128];
         FILE *input;
 	char temp[50];
         input = fopen("client.in","r");
@@ -191,7 +192,7 @@ clientStruct * loadClientInfo()
         
         clientInfo = (clientStruct*)calloc(1,sizeof(clientStruct));
         fscanf(input, "%s", temp);
-        clientInfo->serv_addr.sin_addr.s_addr = atof(temp) ;
+        inet_pton(AF_INET, temp, &clientInfo->serv_addr.sin_addr);
 
         fscanf(input, "%s", temp);
         clientInfo->serv_portNum = atoi(temp);	
@@ -211,10 +212,12 @@ clientStruct * loadClientInfo()
         fscanf(input, "%s", temp);
         clientInfo->recv_rate = atoi(temp);
 
+        inet_ntop(AF_INET, &clientInfo->serv_addr.sin_addr, src, sizeof(src));
+
         printf("\n ============================================================== ");
         printf("\n                      CLIENT PARAMETERS                         ");
         printf("\n ============================================================== ");
-        printf("\n |    server ip                       :       %ld     |", clientInfo->serv_addr.sin_addr.s_addr);
+        printf("\n |    server ip                       :       %s     |", src);
         printf("\n |    server port                     :       %d            |", clientInfo->serv_portNum);
         printf("\n |    filename                        :       %s      |", clientInfo->fileName);
         printf("\n |    recieving sliding window size   :       %d              |", clientInfo->rec_Window);
