@@ -34,7 +34,7 @@ interfaceInfo* get_interfaces_client()
 		temp->ifi_next = head;
 		head = temp;
 
-		printf("\n\n%s: ", ifi->ifi_name);
+		printf("\n\n%s: \n", ifi->ifi_name);
 		inet_ntop(AF_INET, &temp->ifi_addr.sin_addr, src, sizeof(src));
 		printf("  IP addr: %s\n",	src);
 		inet_ntop(AF_INET, &temp->ifi_ntmaddr.sin_addr, src, sizeof(src));
@@ -95,19 +95,6 @@ interfaceInfo* get_interfaces_server(int portno)
 int
 main(int argc, char **argv)
 {
-			/*4bind unicast address */
-/*		        sockfd = Socket(AF_INET, SOCK_DGRAM, 0);
-
-		        Setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
-
-		        sa = (struct sockaddr_in *) ifi->ifi_addr;
-		        sa->sin_family = AF_INET;
-		        sa->sin_port = htons(SERV_PORT);
-		        Bind(sockfd, (SA *) sa, sizeof(*sa));
-		        printf("bound %s\n", Sock_ntop((SA *) sa, sizeof(*sa)));
-	
-	}
-*/
 	interfaceInfo		*head = NULL, *temp;
         int count = 0;
         head = get_interfaces_client();
@@ -116,7 +103,7 @@ main(int argc, char **argv)
 	    count++;
 	    head = head->ifi_next;
 	}
-	printf ("Count %d ", count);
+	printf ("Count = %d \n", count);
         return 0;
 }
 
