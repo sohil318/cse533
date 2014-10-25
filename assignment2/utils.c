@@ -123,7 +123,7 @@ interfaceInfo* get_interfaces_server(int portno)
 
 
 }
-
+/*
 int
 main(int argc, char **argv)
 {
@@ -147,7 +147,7 @@ main(int argc, char **argv)
 	//loadContents(1);
         return 0;
 }
-
+*/
 interfaceInfo * loadServerInfo()
 {
         FILE *input;
