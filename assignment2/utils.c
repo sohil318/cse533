@@ -26,8 +26,8 @@ interfaceInfo* get_interfaces_client()
 		    memcpy(&temp->ifi_ntmaddr, netmask, sizeof(struct sockaddr_in));
 		}
 
-		memcpy(&temp->ifi_addr, subnet, sizeof(struct sockaddr_in));
-		subnet->sin_addr.s_addr = sa->sin_addr.s_addr & netmask->sin_addr.s_addr;
+                subnet = sa;
+		subnet->sin_addr.s_addr = (sa->sin_addr.s_addr & netmask->sin_addr.s_addr);
 
 		memcpy(&temp->ifi_subnetaddr, subnet, sizeof(struct sockaddr_in));
 
@@ -35,13 +35,13 @@ interfaceInfo* get_interfaces_client()
 		head = temp;
 
 		printf("\n\n%s: ", ifi->ifi_name);
-		inet_ntop(AF_INET, &sa->sin_addr, src, sizeof(src));
+		inet_ntop(AF_INET, &temp->ifi_addr.sin_addr, src, sizeof(src));
 		printf("  IP addr: %s\n",	src);
-/*		inet_ntop(AF_INET, &netmask->sin_addr, src, sizeof(src));
+		inet_ntop(AF_INET, &temp->ifi_ntmaddr.sin_addr, src, sizeof(src));
 		printf("  Subnet Mask: %s\n",	src);
-		inet_ntop(AF_INET, &subnet->sin_addr, src, sizeof(src));
+		inet_ntop(AF_INET, &temp->ifi_subnetaddr.sin_addr, src, sizeof(src));
 		printf("  Subnet Addr: %s\n",	src);
-*/		
+		
 	}
 	free_ifi_info_plus(ifihead);
 	return head;
@@ -108,13 +108,15 @@ main(int argc, char **argv)
 	
 	}
 */
-        get_interfaces_client();
-	//while (head->ifi_next)
-	//{
-	//    count++;
-	//    head = head->ifi_next;
-	//}
-	//printf ("Count %d ", count);
+	interfaceInfo		*head = NULL, *temp;
+        int count = 0;
+        head = get_interfaces_client();
+	while (head)
+	{
+	    count++;
+	    head = head->ifi_next;
+	}
+	printf ("Count %d ", count);
         return 0;
 }
 
