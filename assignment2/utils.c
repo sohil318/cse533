@@ -5,35 +5,47 @@ interfaceInfo* get_interfaces_client()
 {
 	interfaceInfo		*head = NULL, *temp;
 	struct ifi_info		*ifi, *ifihead;
-	struct sockaddr_in	*sa, *netmask;
+	struct sockaddr_in	*sa, *netmask, *subnet;
 	int sockfd;
-
+	char src[128], dst[128];
 
 	for (ifihead = ifi = Get_ifi_info_plus(AF_INET, 1);
 		 ifi != NULL; ifi = ifi->ifi_next) {
 		
 		temp = (interfaceInfo *)malloc(sizeof(interfaceInfo));
 
-		printf("%s: ", ifi->ifi_name);
-		if (ifi->ifi_index != 0)
-			printf("(%d) ", ifi->ifi_index);
-
-		printf("\n");
-		
 		if ( (sa = (struct sockaddr_in *)ifi->ifi_addr) != NULL)
-		    memcpy(&temp->ifi_addr,sa,sizeof(struct sockaddr_in));
-//		    printf("  IP addr: %s\n", Sock_ntop_host(sa, sizeof(*sa)));
-
+		{
+		    //printf("Copied");
+		    memcpy(&temp->ifi_addr, sa, sizeof(struct sockaddr_in));
+		}
 
 		if ( (netmask = (struct sockaddr_in *)ifi->ifi_ntmaddr) != NULL)
-		    memcpy(&temp->ifi_ntmaddr, netmask,sizeof(struct sockaddr_in));
-//			printf("  network mask: %s\n", Sock_ntop_host(sa, sizeof(*sa)));
+		{
+		    //printf("Copied");
+		    memcpy(&temp->ifi_ntmaddr, netmask, sizeof(struct sockaddr_in));
+		}
+
+		memcpy(&temp->ifi_addr, subnet, sizeof(struct sockaddr_in));
+		subnet->sin_addr.s_addr = sa->sin_addr.s_addr & netmask->sin_addr.s_addr;
+
+		memcpy(&temp->ifi_subnetaddr, subnet, sizeof(struct sockaddr_in));
 
 		temp->ifi_next = head;
 		head = temp;
+
+		printf("\n\n%s: ", ifi->ifi_name);
+		inet_ntop(AF_INET, &sa->sin_addr, src, sizeof(src));
+		printf("  IP addr: %s\n",	src);
+/*		inet_ntop(AF_INET, &netmask->sin_addr, src, sizeof(src));
+		printf("  Subnet Mask: %s\n",	src);
+		inet_ntop(AF_INET, &subnet->sin_addr, src, sizeof(src));
+		printf("  Subnet Addr: %s\n",	src);
+*/		
 	}
 	free_ifi_info_plus(ifihead);
 	return head;
+
 }
 
 interfaceInfo* get_interfaces_server(int portno)
@@ -83,15 +95,6 @@ interfaceInfo* get_interfaces_server(int portno)
 int
 main(int argc, char **argv)
 {
-/*	int					sockfd;
-	const int			on = 1;
-	pid_t				pid;
-	struct ifi_info		*ifi, *ifihead;
-	struct sockaddr_in	*sa, cliaddr, wildaddr;
-
-	for (ifihead = ifi = Get_ifi_info_plus(AF_INET, 1);
-		 ifi != NULL; ifi = ifi->ifi_next) {
-*/
 			/*4bind unicast address */
 /*		        sockfd = Socket(AF_INET, SOCK_DGRAM, 0);
 
@@ -106,6 +109,12 @@ main(int argc, char **argv)
 	}
 */
         get_interfaces_client();
+	//while (head->ifi_next)
+	//{
+	//    count++;
+	//    head = head->ifi_next;
+	//}
+	//printf ("Count %d ", count);
         return 0;
 }
 
