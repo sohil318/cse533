@@ -22,6 +22,7 @@ typedef struct servStruct {
 
 typedef struct clientStruct {
 	struct sockaddr_in 	serv_addr;		/* IP address of server		 */
+	struct sockaddr_in 	cli_addr;		/* IP address of client		 */
 	int 			serv_portNum;		/* Server port number		 */
 	char 			*fileName; 		/* Filename to be transferred	 */
 	int 			rec_Window;		/* Recieving sliding window size */
@@ -31,15 +32,12 @@ typedef struct clientStruct {
 	struct InterfaceInfo 	*ifi_head;		/* head of interface linklist    */	 
 } clientStruct;
 
-clientStruct *clientInfo;
-servStruct *servInfo;
 
 /* function prototypes */
 interfaceInfo * get_interfaces_client();
 interfaceInfo * get_interfaces_server(int portno);
-interfaceInfo * loadServerInfo();
-interfaceInfo * loadClientInfo();
-void   loadContents(int type);
+servStruct * loadServerInfo();
+clientStruct * loadClientInfo();
 
 #endif	/* __utils_h */
 

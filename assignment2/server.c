@@ -7,7 +7,8 @@ int main(int argc, char **argv)
 	struct sockaddr_in client_addr;
 	char msg[MAXLINE];
 	socklen_t len;
-	struct InterfaceInfo *interface_list = loadServerInfo();
+        struct servStruct *servInfo = loadServerInfo();
+	struct InterfaceInfo *interface_list = servInfo->ifi_head;
 	struct timeval t;
 	t.tv_sec = 5;
 	t.tv_usec = 0;
