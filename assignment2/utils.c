@@ -52,7 +52,7 @@ interfaceInfo* get_interfaces_server(int portno)
 {
 	interfaceInfo		*head = NULL, *temp;
 	struct ifi_info		*ifi, *ifihead;
-	struct sockaddr_in	*sa, *netmask, *subnet;
+	struct sockaddr_in	*sa, *netmask, *subnet, *sosa;
         const int               on = 1;
 	int sockfd;
 	char src[128], dst[128];
@@ -72,31 +72,35 @@ interfaceInfo* get_interfaces_server(int portno)
 		    memcpy(&temp->ifi_ntmaddr, netmask, sizeof(struct sockaddr_in));
 		}
 
-                subnet = sa;
-		subnet->sin_addr.s_addr = (sa->sin_addr.s_addr & netmask->sin_addr.s_addr);
+		if (sa != NULL && netmask != NULL)
+		{
+		    sockfd = Socket(AF_INET, SOCK_DGRAM, 0);
+		    Setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
 
-		memcpy(&temp->ifi_subnetaddr, subnet, sizeof(struct sockaddr_in));
+		    sosa = (struct sockaddr_in *) ifi->ifi_addr;
+		    sosa->sin_family = AF_INET;
+		    sosa->sin_port = htons(portno);
+		    if (bind(sockfd, (struct sockaddr *) sosa, sizeof(struct sockaddr_in)) < 0)
+			err_sys("bind error");
 
-		sockfd = Socket(AF_INET, SOCK_DGRAM, 0);
-		Setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
-
-		sa = (struct sockaddr_in *) ifi->ifi_addr;
-		sa->sin_family = AF_INET;
-		sa->sin_port = htons(portno);
-		Bind(sockfd, (SA *) sa, sizeof(*sa));
+		    temp->sockfd    = sockfd;
                 
-                temp->sockfd    = sockfd;
-		temp->ifi_next  = head;
-		head = temp;
+		    subnet = sa;
+		    subnet->sin_addr.s_addr = (sa->sin_addr.s_addr & netmask->sin_addr.s_addr);
+		    memcpy(&temp->ifi_subnetaddr, subnet, sizeof(struct sockaddr_in));
 
-		printf("\n\n%s: \n", ifi->ifi_name);
-		printf("  Socket FD: %d\n",   temp->sockfd);
-                inet_ntop(AF_INET, &temp->ifi_addr.sin_addr, src, sizeof(src));
-		printf("  IP addr: %s\n",	src);
-		inet_ntop(AF_INET, &temp->ifi_ntmaddr.sin_addr, src, sizeof(src));
-		printf("  Subnet Mask: %s\n",	src);
-		inet_ntop(AF_INET, &temp->ifi_subnetaddr.sin_addr, src, sizeof(src));
-		printf("  Subnet Addr: %s\n",	src);
+		    temp->ifi_next  = head;
+		    head = temp;
+		    
+		    printf("\n\n%s: \n", ifi->ifi_name);
+		    printf("  Socket FD: %d\n",   temp->sockfd);
+		    inet_ntop(AF_INET, &temp->ifi_addr.sin_addr, src, sizeof(src));
+		    printf("  IP addr: %s\n",	src);
+		    inet_ntop(AF_INET, &temp->ifi_ntmaddr.sin_addr, src, sizeof(src));
+		    printf("  Subnet Mask: %s\n",	src);
+		    inet_ntop(AF_INET, &temp->ifi_subnetaddr.sin_addr, src, sizeof(src));
+		    printf("  Subnet Addr: %s\n",	src);
+		}
 		
 	}
 	free_ifi_info_plus(ifihead);
@@ -118,7 +122,7 @@ main(int argc, char **argv)
 	}
 	printf ("Count = %d \n", count);
         count = 0;
-        head = get_interfaces_server(9876);
+	head = get_interfaces_server(5003);
 	while (head)
 	{
 	    count++;
