@@ -2,19 +2,9 @@
 
 int main(int argc, char **argv)
 {	
-	int 	maxfdpl = -1, nready;
-	fd_set rset, allset;
-	struct sockaddr_in client_addr;
-	char msg[MAXLINE];
-	socklen_t len;
-        struct servStruct *servInfo = loadServerInfo();
-	struct InterfaceInfo *interface_list = servInfo->ifi_head;
-	struct timeval t;
-	t.tv_sec = 5;
-	t.tv_usec = 0;
+	struct InterfaceInfo *interface_list = loadClientInfo();
 	struct InterfaceInfo *head = interface_list;
 
-	FD_ZERO(&allset);
 	while (head!=NULL) {
 		printf("\nWaiting for hfksdfhJselect");
 		maxfdpl = max (maxfdpl, head->sockfd);
@@ -54,3 +44,4 @@ int main(int argc, char **argv)
 int existing_connection(){
 	return 0;
 }
+

@@ -31,15 +31,12 @@ typedef struct clientStruct {
 	struct InterfaceInfo 	*ifi_head;		/* head of interface linklist    */	 
 } clientStruct;
 
-clientStruct *clientInfo;
-servStruct *servInfo;
 
 /* function prototypes */
 interfaceInfo * get_interfaces_client();
 interfaceInfo * get_interfaces_server(int portno);
-interfaceInfo * loadServerInfo();
-interfaceInfo * loadClientInfo();
-void   loadContents(int type);
+servStruct * loadServerInfo();
+clientStruct * loadClientInfo();
 
 #endif	/* __utils_h */
 

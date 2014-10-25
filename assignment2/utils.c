@@ -148,8 +148,10 @@ main(int argc, char **argv)
         return 0;
 }
 */
-interfaceInfo * loadServerInfo()
+
+servStruct * loadServerInfo()
 {
+        servStruct *servInfo;
         FILE *input;
         char temp[50];
         input = fopen("server.in","r");
@@ -172,13 +174,14 @@ interfaceInfo * loadServerInfo()
         printf("\n ============================================================== \n");
         servInfo->ifi_head = get_interfaces_server(servInfo->serv_portNum);
 
-        return servInfo->ifi_head;
+        return servInfo;
 }
 
 
-interfaceInfo * loadClientInfo()
+clientStruct * loadClientInfo()
 {
-	FILE *input;
+	clientStruct *clientInfo;
+        FILE *input;
 	char temp[50];
         input = fopen("client.in","r");
         if (input == NULL){
@@ -222,5 +225,5 @@ interfaceInfo * loadClientInfo()
         
         clientInfo->ifi_head = get_interfaces_client();
         
-        return clientInfo->ifi_head;
+        return clientInfo;
 }
