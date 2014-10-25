@@ -38,7 +38,7 @@ interfaceInfo* get_interfaces_client()
 		temp->ifi_next = head;
 		head = temp;
 
-                printf("\n ||        \t%s     ", ifi->ifi_name);
+                printf("\n ||        %s     ", ifi->ifi_name);
                 inet_ntop(AF_INET, &temp->ifi_addr.sin_addr, src, sizeof(src));
                 printf("\t %s",	src);
                 inet_ntop(AF_INET, &temp->ifi_ntmaddr.sin_addr, src, sizeof(src));
@@ -103,7 +103,7 @@ interfaceInfo* get_interfaces_server(int portno)
 		    temp->ifi_next  = head;
 		    head = temp;
 		    
-		    printf("\n ||         \t%s     ", ifi->ifi_name);
+		    printf("\n ||         %s     ", ifi->ifi_name);
 		    inet_ntop(AF_INET, &temp->ifi_addr.sin_addr, src, sizeof(src));
 		    printf("\t %s",	src);
 		    inet_ntop(AF_INET, &temp->ifi_ntmaddr.sin_addr, src, sizeof(src));
