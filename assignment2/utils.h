@@ -10,8 +10,8 @@ typedef struct InterfaceInfo {
         int                     mask;                   /* Subnet mask bits             */
         struct sockaddr_in      ifi_addr;	        /* primary address              */
         struct sockaddr_in      ifi_ntmaddr;		/* netmask address              */
-        struct sockaddr_in      ifi_subnetAddr;		/* subnet address               */
-        struct InterfaceInfo   *ifi_next;	        /* next of these structures     */
+        struct sockaddr_in      ifi_subnetaddr;		/* subnet address               */
+        struct InterfaceInfo	*ifi_next;	        /* next of these structures     */
 }interfaceInfo;
 
 typedef struct servStruct {

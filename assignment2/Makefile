@@ -1,11 +1,11 @@
 CC = gcc
 
-HOME=/home/courses/cse533/Stevens/unpv13e_solaris2.10
-#HOME=/home/stufs1/sogandhi/cse533/Stevens
-#ASSGN2=/home/stufs1/sogandhi/cse533/Asgn2_code
-ASSGN2=/home/courses/cse533/Asgn2_code
+HOME=/home/stufs1/shipgupta/cse533/Stevens/
+#HOME=/home/stufs1/shipgupta/cse533/Stevens
+#ASSGN2=/home/stufs1/shipgupta/cse533/Asgn2_code
+ASSGN2=/home/stufs1/shipgupta/cse533/Asgn2_code
 
-LIBS = -lresolv -lnsl -lsocket -lpthread\
+LIBS = -lresolv -lpthread\
 	${HOME}/libunp.a\
 
 FLAGS =  -g -O2
