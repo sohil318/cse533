@@ -3,15 +3,19 @@
 /*	Global	declarations	*/
 struct existing_connections *existing_conn;
 
-void child_requestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_in client_addr){
+void child_requestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_in client_addr)
+{
 	int connfd;
 	socklen_t len;
 	struct sockaddr_in	servaddr, clientaddr, socket_addr;
 	// Close other sockets except for the one 
-	while(head!=NULL){
-		if(head->sockfd==sock){
+	while(head!=NULL)
+	{
+		if(head->sockfd==sock)
+		{
 		 	connfd = socket(AF_INET, SOCK_DGRAM, 0);
-    			if (connfd < 0) {
+    			if (connfd < 0) 
+			{
         			printf("failed to create socket (%d)\n", errno);
         			return;
     			}
@@ -21,7 +25,8 @@ void child_requestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_
 		        servaddr.sin_family     	 = AF_INET;
 			servaddr.sin_addr.s_addr 	 = htonl(head->ifi_addr.sin_addr.s_addr);				
     			servaddr.sin_port        	 = htons(0);
-			if(bind(connfd, (SA *) &servaddr, sizeof(servaddr))) {
+			if(bind(connfd, (SA *) &servaddr, sizeof(servaddr))) 
+			{
         			close(connfd);
         			err_sys("error in bind\n");
     			}
@@ -36,15 +41,17 @@ void child_requestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_
                         clientaddr.sin_family              = AF_INET;
                         clientaddr.sin_addr.s_addr         = htonl(client_addr.sin_addr.s_addr);
                         clientaddr.sin_port                = socket_addr.sin_port;
-			if(connect(connfd, (struct sockaddr *)&client_addr, sizeof(struct sockaddr))!=0) {
+			if(connect(connfd, (struct sockaddr *)&client_addr, sizeof(struct sockaddr))!=0) 
+			{
         			printf("init_connection_socket: failed to connect to client\n");
-        		
     			}
 		}
-		else{	
+		else
+		{	
 			/* Closing the other sockets*/
 			close(head->sockfd);
 		}
+		head = head->ifi_next;
 	}
 }
 
@@ -124,4 +131,3 @@ int main(int argc, char **argv)
 	}
 
 }
-

@@ -24,7 +24,8 @@ typedef struct clientStruct {
 	struct sockaddr_in 	serv_addr;		/* IP address of server		 */
 	struct sockaddr_in 	cli_addr;		/* IP address of client		 */
 	int 			serv_portNum;		/* Server port number		 */
-	char 			*fileName; 		/* Filename to be transferred	 */
+	int                     cli_portNum;            /* Client port number            */
+        char 			*fileName; 		/* Filename to be transferred	 */
 	int 			rec_Window;		/* Recieving sliding window size */
 	int 			seed;			/* Random generator seed value 	 */
 	float 			dg_lossProb; 		/* Datagram loss probability     */
