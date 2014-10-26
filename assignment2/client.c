@@ -94,6 +94,7 @@ int createInitialConn(struct clientStruct **cliInfo, int isLocal)
         int sockfd, optval = -1;
         struct sockaddr_in clientIP, serverIP, addr;
         struct clientStruct *temp = *cliInfo;
+	int len;
 	char src[128];
         
         if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
@@ -116,9 +117,11 @@ int createInitialConn(struct clientStruct **cliInfo, int isLocal)
 	if (bind(sockfd, (SA *) &clientIP, sizeof(clientIP)) < 0)
                 err_sys("\nbind error\n");
         
+	len = sizeof(struct sockaddr);
         bzero(&addr, sizeof(struct sockaddr_in));  
-        getsockname(sockfd, (struct sockaddr *)&addr, sizeof(struct sockaddr *));
-        printf("\nClient IP Address = %d \t Port No : %d\n ", inet_ntop(AF_INET, &addr.sin_addr, src, sizeof(src)), ntohs(addr.sin_port)); 
+        getsockname(sockfd, (struct sockaddr *)&addr, &len);
+	inet_ntop(AF_INET, &addr.sin_addr, src, sizeof(src)); 
+        printf("\nClient IP Address = %s \t Port No : %d\n ", src, ntohs(addr.sin_port)); 
         temp->cli_portNum = ntohs(addr.sin_port);
 
         /* Connect socket to Server IP */
@@ -131,8 +134,9 @@ int createInitialConn(struct clientStruct **cliInfo, int isLocal)
                 err_sys("\nconnect error\n");
         
         bzero(&addr, sizeof(struct sockaddr_in));  
-        getpeername(sockfd, (struct sockaddr *)&addr, sizeof(struct sockaddr *));
-        printf("\nServer IP Address = %d \t Port No : %d\n ", inet_ntop(AF_INET, &addr.sin_addr, src, sizeof(src)), ntohs(addr.sin_port)); 
+        getpeername(sockfd, (struct sockaddr *)&addr, &len);
+	inet_ntop(AF_INET, &addr.sin_addr, src, sizeof(src)); 
+	printf("\nServer IP Address = %s \t Port No : %d\n ", src, ntohs(addr.sin_port)); 
         
         cliInfo = &temp;
         return sockfd;

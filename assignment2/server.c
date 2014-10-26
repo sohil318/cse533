@@ -1,5 +1,17 @@
 #include	 "utils.h"
 
+void child_client(int sock, struct InterfaceInfo *head){
+	// Close other sockets except for the one 
+	while(head!=NULL){
+		if(head->sockfd==sock){
+
+		}
+		else{
+			close(head->sockfd);
+		}
+	}
+}
+
 int main(int argc, char **argv)
 {	
 	int 	maxfdpl = -1, nready, pid;
@@ -56,17 +68,6 @@ int main(int argc, char **argv)
 
 }
 
-void child_client(int sock, struct InterfaceInfo *head){
-	// Close other sockets except for the one 
-	while(head!=NULL){
-		if(head->sockfd==sock){
-
-		}
-		else{
-			close(head->sockfd);
-		}
-	}
-}
 
 
 int existing_connection(){
