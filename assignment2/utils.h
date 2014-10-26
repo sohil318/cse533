@@ -32,6 +32,14 @@ typedef struct clientStruct {
 	struct InterfaceInfo 	*ifi_head;		/* head of interface linklist    */	 
 } clientStruct;
 
+typedef struct existing_connections {
+	struct sockaddr_in		serv_addr;		/* IP address of server		 */
+	int				serv_portNum;		/* Server port number		 */
+	struct sockaddr_in		client_addr;		/* IP address of client		 */
+	int				client_portNum;		/* Client port number		 */
+	int				child_pid;		/* child pid			 */
+	struct existing_connections	*next_connection;	/* next of these structures	 */
+}existing_connections;
 
 /* function prototypes */
 interfaceInfo * get_interfaces_client();
