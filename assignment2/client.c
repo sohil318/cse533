@@ -33,7 +33,7 @@ int checkLocal (struct clientStruct **cliInfo)
         inet_ntop(AF_INET, &temp->serv_addr.sin_addr, src, sizeof(src));
         if (strcmp(src, LOOPBACK) == 0)
         {
-                printf ("\nServer IP is Loopback Address. Client IP = 127.0.0.1\n");
+                //printf ("\nServer IP is Loopback Address. Client IP = 127.0.0.1\n");
                 temp->cli_addr = temp->serv_addr;
                 cliInfo = &temp;
 		return 1;
@@ -43,7 +43,6 @@ int checkLocal (struct clientStruct **cliInfo)
         {
 		if ((temp->serv_addr.sin_addr.s_addr & head->ifi_ntmaddr.sin_addr.s_addr) == head->ifi_subnetaddr.sin_addr.s_addr)
                 {
-//			printf("\nFound match\n");
 			lcs = getSubnetCount(head->ifi_ntmaddr.sin_addr.s_addr);
 			if (lcs > maxlcs)
 			{
@@ -59,29 +58,113 @@ int checkLocal (struct clientStruct **cliInfo)
 	else
 	    return 1;
 	
-	//inet_ntop(AF_INET, &temp->serv_addr.sin_addr, src, sizeof(src));
-        //printf("\nClient Address : %s",	src);
+}
 
-        return 0;
+/*
+ * Assign Non Local Client IP
+ */
+
+void assignCliIPnonLocal(struct clientStruct **cliInfo)
+{
+        struct clientStruct *temp = *cliInfo;
+        struct InterfaceInfo *head = temp->ifi_head;
+        char src[128];
+        
+        inet_ntop(AF_INET, &head->ifi_addr.sin_addr, src, sizeof(src));
+        if (strcmp(src, LOOPBACK) == 0)
+        {
+                if (head->ifi_next)
+                {
+                        temp->cli_addr = head->ifi_next->ifi_addr;
+                }
+        }
+        else
+                temp->cli_addr = head->ifi_addr;
+
+        cliInfo = &temp;
+	return;
+}
+
+/*
+ * Create Initial Connection
+ */
+
+int createInitialConn(struct clientStruct **cliInfo, int isLocal)
+{
+        int sockfd, optval = -1;
+        struct sockaddr_in clientIP, serverIP, addr;
+        struct clientStruct *temp = *cliInfo;
+	char src[128];
+        
+        if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
+                err_sys("\nsocket creation error\n");
+
+        if(isLocal)
+                if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0)
+                {
+                        printf("\nerror : socket option error.\n");
+                        close(sockfd);
+                        exit(2);
+                }
+        
+        /* Bind socket to client IP */
+        bzero(&clientIP, sizeof(clientIP));
+        clientIP.sin_family =   AF_INET;
+        clientIP.sin_port   =   htons(0);
+        clientIP.sin_addr   =   temp->cli_addr.sin_addr;
+       
+	if (bind(sockfd, (SA *) &clientIP, sizeof(clientIP)) < 0)
+                err_sys("\nbind error\n");
+        
+        bzero(&addr, sizeof(struct sockaddr_in));  
+        getsockname(sockfd, (struct sockaddr *)&addr, sizeof(struct sockaddr *));
+        printf("\nClient IP Address = %d \t Port No : %d\n ", inet_ntop(AF_INET, &addr.sin_addr, src, sizeof(src)), ntohs(addr.sin_port)); 
+        temp->cli_portNum = ntohs(addr.sin_port);
+
+        /* Connect socket to Server IP */
+        bzero(&serverIP, sizeof(serverIP));
+        serverIP.sin_family =   AF_INET;
+        serverIP.sin_port   =   htons(temp->serv_portNum);
+        serverIP.sin_addr   =   temp->serv_addr.sin_addr;
+       
+	if (connect(sockfd, (SA *) &serverIP, sizeof(serverIP)) < 0)
+                err_sys("\nconnect error\n");
+        
+        bzero(&addr, sizeof(struct sockaddr_in));  
+        getpeername(sockfd, (struct sockaddr *)&addr, sizeof(struct sockaddr *));
+        printf("\nServer IP Address = %d \t Port No : %d\n ", inet_ntop(AF_INET, &addr.sin_addr, src, sizeof(src)), ntohs(addr.sin_port)); 
+        
+        cliInfo = &temp;
+        return sockfd;
 
 }
 
 int main(int argc, char **argv)
 {	
-	struct clientStruct *clientInfo = loadClientInfo();
-        int isLocal;
+	struct clientStruct  *clientInfo        =       loadClientInfo();
+        int isLocal, sockfd;
 	char src[128];
 
         if (clientInfo)
                 isLocal = checkLocal(&clientInfo);
         
 	if (isLocal)
-	    printf("\nIP Address is local\n");
+	    printf("\nServer IP Address is local\n");
 	else
-	    printf("\nServer IP is non local.\n");
-        
+	{
+                assignCliIPnonLocal(&clientInfo);
+                printf("\nServer IP is non local.\n");
+        }
+
+/*
+	inet_ntop(AF_INET, &clientInfo->serv_addr.sin_addr, src, sizeof(src));
+        printf("\nServer IP Address : %s",	src);
 	inet_ntop(AF_INET, &clientInfo->cli_addr.sin_addr, src, sizeof(src));
         printf("\nClient Address : %s",	src);
+*/
+
+        sockfd = createInitialConn(&clientInfo, isLocal);
+        write(sockfd, clientInfo->fileName, sizeof(clientInfo->fileName));
 
 }
 
