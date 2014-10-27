@@ -148,6 +148,8 @@ int main(int argc, char **argv)
 	struct clientStruct  *clientInfo        =       loadClientInfo();
         int isLocal, sockfd;
 	char src[128];
+	char recvBuff[1024];	
+	struct sockaddr_in servIP;	
 
         if (clientInfo)
                 isLocal = checkLocal(&clientInfo);
@@ -160,6 +162,8 @@ int main(int argc, char **argv)
                 printf("\nServer IP is non local.\n");
         }
 
+	memset(recvBuff, '0',sizeof(recvBuff));
+
 /*
 	inet_ntop(AF_INET, &clientInfo->serv_addr.sin_addr, src, sizeof(src));
         printf("\nServer IP Address : %s",	src);
@@ -170,6 +174,23 @@ int main(int argc, char **argv)
         sockfd = createInitialConn(&clientInfo, isLocal);
 //        write(sockfd, "sjdas", 5);
         write(sockfd, clientInfo->fileName, sizeof(clientInfo->fileName));
+	
+	read(sockfd, recvBuff, sizeof(recvBuff));
+	printf("New port number recieved from Server : %d \n", ntohs(atoi(recvBuff)));
+	clientInfo->serv_portNum= htons(atoi(recvBuff));
+
+	/* Connect to the server on new port */
+	bzero(&servIP, sizeof(servIP));
+        servIP.sin_family =   AF_INET;
+        servIP.sin_port   =   htons(clientInfo->serv_portNum);
+        servIP.sin_addr   =   clientInfo->serv_addr.sin_addr;
+	if (connect(sockfd, (SA *) &servIP, sizeof(servIP)) < 0)
+                err_sys("\nconnect error\n");
+
+	/* Sending the 3-hand shake */
+	char msg[] = "ACK: 3-Handshake";
+	write(sockfd, msg, sizeof(msg));        
+
 //	while (1);
 }
 
