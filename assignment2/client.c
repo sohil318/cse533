@@ -172,12 +172,11 @@ int main(int argc, char **argv)
 */
 
         sockfd = createInitialConn(&clientInfo, isLocal);
-//        write(sockfd, "sjdas", 5);
         write(sockfd, clientInfo->fileName, sizeof(clientInfo->fileName));
 	
 	read(sockfd, recvBuff, sizeof(recvBuff));
 	printf("New port number recieved from Server : %d \n", ntohs(atoi(recvBuff)));
-	clientInfo->serv_portNum= htons(atoi(recvBuff));
+	clientInfo->serv_portNum = htons(atoi(recvBuff));
 
 	/* Connect to the server on new port */
 	bzero(&servIP, sizeof(servIP));

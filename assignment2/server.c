@@ -30,12 +30,12 @@ int checkLocal (struct sockaddr_in serverIP, struct sockaddr_in serverIPnmsk, st
 
 
 /* Forked server child for service requesting client */ 
-void childRequestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_in client_addr)
+int childRequestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_in client_addr)
 {
 	int sockfd, isLocal, optval = -1;
 	socklen_t len;
 	struct sockaddr_in	servaddr, clientaddr, addr;
-	char src[128];
+	char src[128], buf[1024];
 	
 	// Close other sockets except for the one 
 	while(head != NULL)
@@ -48,7 +48,7 @@ void childRequestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_i
 			    err_sys("\nsocket creation error\n");
 
 			if(isLocal)
-			    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0)
+			    if (setsockopt(sockfd, SOL_SOCKET, SO_DONTROUTE, &optval, sizeof(optval)) < 0)
 			    {
 				printf("\nerror : socket option error.\n");
 				close(sockfd);
@@ -90,6 +90,15 @@ void childRequestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_i
 		}
 		head = head->ifi_next;
 	}
+
+	/* Send new connection socket to client */
+	sprintf(buf, "%d", addr.sin_port);
+	sendto(sock, buf, sizeof(buf), 0, (SA *)&client_addr, sizeof(client_addr));
+	read(sockfd, buf, sizeof(buf));
+	printf("\nReceived 3rd Hand Shake : %s", buf);
+	//char msg[] = "ACK: 3-Handshake";
+
+	//return ntohs(addr.sin_port);
 }
 
 int existing_connection(struct sockaddr_in *client_addr){
@@ -154,7 +163,7 @@ void listenInterfaces(struct servStruct *servInfo)
 				else {
 					if ((pid = fork()) == 0)
                                         {
-                                                printf("\nClient Request Handler forked .");
+//                                                printf("\nClient Request Handler forked .");
 						childRequestHandler(head->sockfd, interfaceList, clientInfo);
 						exit(0);
 					}
@@ -168,7 +177,7 @@ void listenInterfaces(struct servStruct *servInfo)
 						new_conn->serv_addr = head->ifi_addr;
 						new_conn->next_connection = existing_conn;
 						existing_conn = new_conn;
-						printf("\nelse to be done");
+//						printf("\nelse to be done");
 					}
 				}
 			}
