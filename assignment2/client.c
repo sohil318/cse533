@@ -169,6 +169,6 @@ int main(int argc, char **argv)
 
         sockfd = createInitialConn(&clientInfo, isLocal);
         write(sockfd, clientInfo->fileName, sizeof(clientInfo->fileName));
-
+//	while (1);
 }
 
