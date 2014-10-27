@@ -137,7 +137,7 @@ void listenInterfaces(struct servStruct *servInfo)
 				len = sizeof(clientInfo);
 				recvfrom(head->sockfd, msg, MAXLINE, 0, (struct sockaddr *)&clientInfo, &len);
 				inet_ntop(AF_INET, &clientInfo.sin_addr, src, sizeof(src));
-				printf("\nClient Address %s: \n", src );
+				printf("\nClient Address  %s & port number %d \n", src, clientInfo.sin_port);
                                 printf("\nFilename %s: \n", msg);
 				
                                 if( existing_connection(&clientInfo) == 1 ) { 
