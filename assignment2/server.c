@@ -112,6 +112,35 @@ int existing_connection(struct sockaddr_in *client_addr){
 	return 0;
 }
 
+/* Executed when server-child process dies */
+static void
+exitChild_handler (int signo)
+{
+	int l;
+    	pid_t pid, del_pid = 0;
+	struct existing_connections *prev = existing_conn; 
+	struct existing_connections *next = existing_conn;	
+
+    	while ((pid = waitpid(-1, &l, WNOHANG)) > 0) {
+        	printf("\n Child %d terminated (%d)\n", 
+               	(int)pid, l);
+    	}
+	
+	/* Delete the entry from existing connection list*/
+	while(next!=NULL){
+		if(next->child_pid == pid){
+			if(next->child_pid==existing_conn->child_pid){
+				existing_conn = next->next_connection;
+			}
+			else {
+			prev->next_connection = next->next_connection;		
+			}
+		}
+		prev=next;
+		next= next->next_connection;
+	}	
+}	
+
 void listenInterfaces(struct servStruct *servInfo)
 {
 	fd_set rset, allset;
@@ -193,4 +222,5 @@ int main(int argc, char **argv)
 	struct servStruct *servInfo = loadServerInfo();
 
         listenInterfaces (servInfo);
+	signal(SIGCHLD, exitChild_handler);
 }
