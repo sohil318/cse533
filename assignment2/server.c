@@ -118,7 +118,6 @@ void listenInterfaces(struct servStruct **serv)
 					printf("Duplicate connection request!");
 				}
 				else {
-					pid = fork();
 					if ((pid = fork()) == 0)
                                         {
                                                 printf("\nClient Request Handler forked .");
@@ -130,6 +129,7 @@ void listenInterfaces(struct servStruct **serv)
 						new_conn->client_addr.sin_addr.s_addr = clientInfo.sin_addr.s_addr;
 						new_conn->client_portNum = clientInfo.sin_port;
 						new_conn->child_pid = pid;
+						new_conn->serv_addr = head->ifi_addr;
 						new_conn->next_connection = existing_conn;
 						existing_conn = new_conn;
 					}
