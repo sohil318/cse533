@@ -123,31 +123,6 @@ interfaceInfo* get_interfaces_server(int portno)
 
 
 }
-/*
-int
-main(int argc, char **argv)
-{
-	interfaceInfo		*head = NULL, *temp;
-        int count = 0;
-        head = loadClientInfo();
-	while (head)
-	{
-	    count++;
-	    head = head->ifi_next;
-	}
-	//printf ("Count = %d \n", count);
-        count = 0;
-	head = loadServerInfo();
-	while (head)
-	{
-	    count++;
-	    head = head->ifi_next;
-	}
-	//printf ("Count = %d \n", count);
-	//loadContents(1);
-        return 0;
-}
-*/
 
 servStruct * loadServerInfo()
 {

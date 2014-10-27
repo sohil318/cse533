@@ -15,9 +15,9 @@ typedef struct InterfaceInfo {
 }interfaceInfo;
 
 typedef struct servStruct {
-	int 			 serv_portNum;		/* Well know server port number */
-	int 			 send_Window;		/* MaxSending sliding win size  */
-	struct InterfaceInfo	 *ifi_head;
+	struct InterfaceInfo	*ifi_head;
+	int 			serv_portNum;		/* Well know server port number */
+	int 			send_Window;		/* MaxSending sliding win size  */
 } servStruct;
 
 typedef struct clientStruct {
