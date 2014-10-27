@@ -168,6 +168,7 @@ int main(int argc, char **argv)
 */
 
         sockfd = createInitialConn(&clientInfo, isLocal);
+//        write(sockfd, "sjdas", 5);
         write(sockfd, clientInfo->fileName, sizeof(clientInfo->fileName));
 //	while (1);
 }

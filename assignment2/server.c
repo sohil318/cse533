@@ -89,12 +89,11 @@ void listenInterfaces(struct servStruct *servInfo)
 		FD_SET(head->sockfd, &allset);
 		head = head->ifi_next;
 	}
-	printf("\n Max FD : %d", maxfdpl);
-        /* Server waits on select. When client comes, forks a child server to handle client */
-
+        
+	
+	/* Server waits on select. When client comes, forks a child server to handle client */
 	for (;;) {
 		rset = allset;
-		printf("\nWaiting for select");
 		if ((nready = select(maxfdpl+1, &rset, NULL, NULL, NULL) ) < 0) {
 			if (errno == EINTR ) {
 				continue;
@@ -103,16 +102,12 @@ void listenInterfaces(struct servStruct *servInfo)
 				err_sys("error in select");
 			}
 		}
-		printf ("\nRecvd a client 1");
                 head = interfaceList;
-		printf ("\nRecvd a client 2");
 		while (head) {
-		    printf ("\nRecvd a client 3");
-			if(FD_ISSET(head->sockfd, &allset)) {
-				printf ("\nRecvd a client 4");
+			if(FD_ISSET(head->sockfd, &rset)) {
+				len = sizeof(clientInfo);
 				recvfrom(head->sockfd, msg, MAXLINE, 0, (struct sockaddr *)&clientInfo, &len);
 				inet_ntop(AF_INET, &clientInfo.sin_addr, src, sizeof(src));
-				printf ("\nRecvd a client 5");
 				printf("\nClient Address %s: \n", src );
                                 printf("\nFilename %s: \n", msg);
 				
@@ -138,10 +133,8 @@ void listenInterfaces(struct servStruct *servInfo)
 					}
 				}
 			}
-			printf("Checking FD");
 			head = head->ifi_next;
 		}
-		printf ("\nRecvd a client 8");
 	}
 }
 
