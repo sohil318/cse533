@@ -172,6 +172,7 @@ int main(int argc, char **argv)
 */
 
         sockfd = createInitialConn(&clientInfo, isLocal);
+//        write(sockfd, "sjdas", 5);
         write(sockfd, clientInfo->fileName, sizeof(clientInfo->fileName));
 	
 	read(sockfd, recvBuff, sizeof(recvBuff));
@@ -190,5 +191,6 @@ int main(int argc, char **argv)
 	char msg[] = "ACK: 3-Handshake";
 	write(sockfd, msg, sizeof(msg));        
 
+//	while (1);
 }
 

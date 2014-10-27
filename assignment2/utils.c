@@ -198,7 +198,9 @@ clientStruct * loadClientInfo()
         clientInfo->serv_portNum = atoi(temp);	
 
         fscanf(input, "%s", temp);
-        clientInfo->fileName = temp;
+//        printf("Input str : %s", temp);
+        temp[sizeof(temp)] = '\0';
+	strncpy(clientInfo->fileName, temp, sizeof(temp));
 
         fscanf(input, "%s", temp);
         clientInfo->rec_Window = atoi(temp);

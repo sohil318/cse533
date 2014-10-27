@@ -11,7 +11,7 @@ void child_requestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_
 	// Close other sockets except for the one 
 	while(head!=NULL)
 	{
-		if(head->sockfd==sock)
+		if(head->sockfd == sock)
 		{
 		 	connfd = socket(AF_INET, SOCK_DGRAM, 0);
     			if (connfd < 0) 
@@ -66,7 +66,7 @@ int existing_connection(struct sockaddr_in *client_addr){
 	return 0;
 }
 
-void listenInterfaces(struct servStruct **serv)
+void listenInterfaces(struct servStruct *servInfo)
 {
 	fd_set rset, allset;
 	socklen_t len;
@@ -77,7 +77,6 @@ void listenInterfaces(struct servStruct **serv)
         int 	maxfdpl = -1, nready, pid;
 	
         struct sockaddr_in clientInfo;
-	struct servStruct *servInfo = *serv;
         struct InterfaceInfo *head  = servInfo->ifi_head;
         struct InterfaceInfo *interfaceList  = servInfo->ifi_head;
         	
@@ -86,17 +85,15 @@ void listenInterfaces(struct servStruct **serv)
         /* Setup select all interface sockfd's to listen for incoming client */
         while (head != NULL) 
         {
-		printf("\nWaiting for hfksdfhJselect");
 		maxfdpl = max (maxfdpl, head->sockfd);
 		FD_SET(head->sockfd, &allset);
 		head = head->ifi_next;
 	}
-
-        /* Server waits on select. When client comes, forks a child server to handle client */
-
+        
+	
+	/* Server waits on select. When client comes, forks a child server to handle client */
 	for (;;) {
 		rset = allset;
-		printf("\nWaiting for select");
 		if ((nready = select(maxfdpl+1, &rset, NULL, NULL, NULL) ) < 0) {
 			if (errno == EINTR ) {
 				continue;
@@ -105,11 +102,11 @@ void listenInterfaces(struct servStruct **serv)
 				err_sys("error in select");
 			}
 		}
-	
                 head = interfaceList;
-		while (head != NULL) {
-			if(FD_ISSET(head->sockfd, &allset)) {
-				recvfrom(head->sockfd, msg, MAXLINE, 0, (struct sockaddr*)&clientInfo, &len);
+		while (head) {
+			if(FD_ISSET(head->sockfd, &rset)) {
+				len = sizeof(clientInfo);
+				recvfrom(head->sockfd, msg, MAXLINE, 0, (struct sockaddr *)&clientInfo, &len);
 				inet_ntop(AF_INET, &clientInfo.sin_addr, src, sizeof(src));
 				printf("\nClient Address %s: \n", src );
                                 printf("\nFilename %s: \n", msg);
@@ -125,13 +122,14 @@ void listenInterfaces(struct servStruct **serv)
 					}
 					else 
                                         {
-						struct existing_connections *new_conn;
+					/*	struct existing_connections *new_conn;
 						new_conn->client_addr.sin_addr.s_addr = clientInfo.sin_addr.s_addr;
 						new_conn->client_portNum = clientInfo.sin_port;
 						new_conn->child_pid = pid;
 						new_conn->serv_addr = head->ifi_addr;
 						new_conn->next_connection = existing_conn;
-						existing_conn = new_conn;
+						existing_conn = new_conn;*/
+						printf("\nelse to be done");
 					}
 				}
 			}
@@ -144,5 +142,5 @@ int main(int argc, char **argv)
 {	
 	struct servStruct *servInfo = loadServerInfo();
 
-        listenInterfaces (&servInfo);
+        listenInterfaces (servInfo);
 }
