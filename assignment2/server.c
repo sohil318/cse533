@@ -66,35 +66,38 @@ int existing_connection(struct sockaddr_in *client_addr){
 	return 0;
 }
 
-int main(int argc, char **argv)
-{	
-	int 	maxfdpl = -1, nready, pid;
+void listenInterfaces(struct servStruct **serv)
+{
 	fd_set rset, allset;
-	struct sockaddr_in client_addr;
-	char msg[MAXLINE];
 	socklen_t len;
+	
+        char msg[MAXLINE];
 	char src[128];
-	struct servStruct *servInfo = loadServerInfo();
-	struct InterfaceInfo *interface_list = servInfo->ifi_head;
-	struct timeval t;
-	t.tv_sec = 5;
-	t.tv_usec = 0;
-	struct InterfaceInfo *head = interface_list;
-
-	FD_ZERO(&allset);
-	while (head!=NULL) {
+	
+        int 	maxfdpl = -1, nready, pid;
+	
+        struct sockaddr_in clientInfo;
+	struct servStruct *servInfo = *serv;
+        struct InterfaceInfo *head  = servInfo->ifi_head;
+        struct InterfaceInfo *interfaceList  = servInfo->ifi_head;
+        	
+        FD_ZERO(&allset);
+	
+        /* Setup select all interface sockfd's to listen for incoming client */
+        while (head != NULL) 
+        {
 		printf("\nWaiting for hfksdfhJselect");
 		maxfdpl = max (maxfdpl, head->sockfd);
 		FD_SET(head->sockfd, &allset);
 		head = head->ifi_next;
 	}
-	printf("\niOutWaiting for hfksdfhJselect");
+
+        /* Server waits on select. When client comes, forks a child server to handle client */
 
 	for (;;) {
-		printf("\njhwewWaiting for select");
 		rset = allset;
 		printf("\nWaiting for select");
-		if ( (nready = select(maxfdpl+1, &rset, NULL, NULL, &t) ) <2 ) {
+		if ((nready = select(maxfdpl+1, &rset, NULL, NULL, NULL) ) < 0) {
 			if (errno == EINTR ) {
 				continue;
 			}
@@ -102,24 +105,30 @@ int main(int argc, char **argv)
 				err_sys("error in select");
 			}
 		}
-		head = interface_list;
-		while (head!=NULL) {
+	
+                head = interfaceList;
+		while (head != NULL) {
 			if(FD_ISSET(head->sockfd, &allset)) {
-				recvfrom(head->sockfd, msg, MAXLINE, 0, (struct sockaddr*)&client_addr, &len);
-				inet_ntop(AF_INET, &client_addr.sin_addr, src, sizeof(src));
+				recvfrom(head->sockfd, msg, MAXLINE, 0, (struct sockaddr*)&clientInfo, &len);
+				inet_ntop(AF_INET, &clientInfo.sin_addr, src, sizeof(src));
 				printf("\nClient Address %s: \n", src );
-				if(existing_connection(&client_addr)==1){ 
+                                printf("\nFilename %s: \n", msg);
+				
+                                if( existing_connection(&clientInfo) == 1 ) { 
 					printf("Duplicate connection request!");
 				}
 				else {
 					pid = fork();
-					if(pid==0){
-						child_requestHandler(head->sockfd, interface_list, client_addr);
+					if ((pid = fork()) == 0)
+                                        {
+                                                printf("\nClient Request Handler forked .");
+						//child_requestHandler(head->sockfd, interface_list, client_addr);
 					}
-					else {
+					else 
+                                        {
 						struct existing_connections *new_conn;
-						new_conn->client_addr.sin_addr.s_addr = client_addr.sin_addr.s_addr;
-						new_conn->client_portNum = client_addr.sin_port;
+						new_conn->client_addr.sin_addr.s_addr = clientInfo.sin_addr.s_addr;
+						new_conn->client_portNum = clientInfo.sin_port;
 						new_conn->child_pid = pid;
 						new_conn->next_connection = existing_conn;
 						existing_conn = new_conn;
@@ -129,5 +138,11 @@ int main(int argc, char **argv)
 			head = head->ifi_next;
 		}
 	}
+}
 
+int main(int argc, char **argv)
+{	
+	struct servStruct *servInfo = loadServerInfo();
+
+        listenInterfaces (&servInfo);
 }
