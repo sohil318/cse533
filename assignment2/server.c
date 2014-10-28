@@ -15,14 +15,10 @@ int checkLocal (struct sockaddr_in serverIP, struct sockaddr_in serverIPnmsk, st
 
         inet_ntop(AF_INET, &serverIP.sin_addr, src, sizeof(src));
         if (strcmp(src, LOOPBACK) == 0)
-        {
 		return 1;
-        }
         
 	else if ((serverIPnmsk.sin_addr.s_addr & clientIP.sin_addr.s_addr) == serverIPsubnet.sin_addr.s_addr)
-        {
 	    return 1;
-	}
 	
 	return 0;
 	
@@ -38,9 +34,12 @@ void sendFile(int sockfd, char filename[496])
          FILE *fp;
 
          fp = fopen(filename, "r");
-         fread(buf, sizeof(buf[0]), 496, fp);
-	 write(sockfd, buf, sizeof(buf));        
-         printf("%s", buf);
+         while (fread(buf, sizeof(buf[0]), 496, fp))
+	 {
+	    fseek(fp, 496,SEEK_CUR);
+	    write(sockfd, buf, sizeof(buf));        
+         }
+	 //printf("%s", buf);
 }
 
 

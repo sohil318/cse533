@@ -149,9 +149,13 @@ int createInitialConn(struct clientStruct **cliInfo, int isLocal)
 
 void recvFile(int sockfd)
 {
-         char recvmsg[496];
-         read(sockfd, recvmsg, sizeof(recvmsg));
-	 printf("File contents: %s \n", recvmsg);
+	char recvmsg[496];
+	printf("File contents: %s \n", recvmsg);
+        while (1)
+	{
+	    read(sockfd, recvmsg, sizeof(recvmsg));
+	    printf("%s", recvmsg);
+         }
 }
 
 int main(int argc, char **argv)
