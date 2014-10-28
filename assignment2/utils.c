@@ -207,3 +207,49 @@ clientStruct * loadClientInfo()
         
         return clientInfo;
 }
+
+hdr* createHeader(int msgtype, int seqnum, int advwin, int ts)
+{
+        hdr* header;
+        header->msg_type        = msgtype;
+        header->seq_num         = seqnum;
+        header->adv_window      = advwin;
+        header->timestamp       = ts;
+        return header;
+}
+
+struct msghdr* createDataPacket(hdr* dataheader, char *data, int datalen)
+{
+        struct msghdr *datamsg;
+        struct iovec dataiovec[2];
+
+        bzero(&datamsg, sizeof(struct msghdr));
+        datamsg->msg_name       = NULL;
+        datamsg->msg_namelen    = 0;
+        datamsg->msg_iov        = dataiovec;
+        datamsg->msg_iovlen     = 2;
+
+        dataiovec[0].iov_base   = (void *)dataheader;
+        dataiovec[0].iov_len    = sizeof(dataheader);
+        dataiovec[1].iov_base   = data;
+        dataiovec[1].iov_len    = datalen;
+
+        return datamsg;
+}
+
+struct msghdr* createAckPacket(hdr *ackheader)
+{
+        struct msghdr *ackmsg;
+        struct iovec ackiovec[1];
+
+        bzero(&ackmsg, sizeof(struct msghdr));
+        ackmsg->msg_name       = NULL;
+        ackmsg->msg_namelen    = 0;
+        ackmsg->msg_iov        = ackiovec;
+        ackmsg->msg_iovlen     = 1;
+
+        ackiovec[0].iov_base   = (void *)ackheader;
+        ackiovec[0].iov_len    = sizeof(ackheader);
+
+        return ackmsg;
+}

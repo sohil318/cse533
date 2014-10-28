@@ -72,6 +72,10 @@ interfaceInfo * get_interfaces_client();
 interfaceInfo * get_interfaces_server(int portno);
 servStruct * loadServerInfo();
 clientStruct * loadClientInfo();
+hdr* createHeader(int msgtype, int seqnum, int advwin, int ts);
+struct msghdr* createDataPacket(hdr *dataheader , char *data, int datalen);
+struct msghdr* createAckPacket(hdr *ackheader);
+
 
 #endif	/* __utils_h */
 
