@@ -44,16 +44,16 @@ void sendFile(int sockfd, char filename[496])
 
 
 /* Setup connection with using new port */
-int createNewConn (int isLocal, struct sockaddr_in client_addr, struct sockaddr_in &clientaddr, struct sockaddr_in &servaddr, struct InterfaceInfo *head)
+int createConn(int isLocal, struct sockaddr_in client_addr, struct sockaddr_in *clientaddr, struct sockaddr_in *servaddr, struct sockaddr_in *addr, struct InterfaceInfo *head)
 {
 	int sockfd, optval = -1;
 	socklen_t len;
-	struct sockaddr_in       addr;
 	char src[128];
         
         if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
                 err_sys("\nsocket creation error\n");
 
+	printf("socket completed");
         if(isLocal)
                 if (setsockopt(sockfd, SOL_SOCKET, SO_DONTROUTE, &optval, sizeof(optval)) < 0)
                 {
@@ -61,30 +61,31 @@ int createNewConn (int isLocal, struct sockaddr_in client_addr, struct sockaddr_
                         close(sockfd);
                         exit(2);
                 }
+	printf("socket completed");
 
         /* binding to the serv ip */
         bzero(&servaddr, sizeof(servaddr));
-        servaddr.sin_family     	 = AF_INET;
-        servaddr.sin_addr.s_addr 	 = htonl(head->ifi_addr.sin_addr.s_addr);				
-        servaddr.sin_port        	 = htons(0);
-        if(bind(sockfd, (SA *) &servaddr, sizeof(servaddr))) 
+        servaddr->sin_family     	 = AF_INET;
+        servaddr->sin_addr.s_addr 	 = htonl(head->ifi_addr.sin_addr.s_addr);				
+        servaddr->sin_port        	 = htons(0);
+        if(bind(sockfd, (SA *) servaddr, sizeof(servaddr))) 
         {
                 close(sockfd);
                 err_sys("error in bind\n");
         }
-
+	printf("bind completed");
         /* determining the port number */
         len = sizeof(struct sockaddr);
         bzero(&addr, sizeof(struct sockaddr_in));  
-        getsockname(sockfd, (struct sockaddr *)&addr, &len);
-        inet_ntop(AF_INET, &addr.sin_addr, src, sizeof(src)); 
-        printf("\nClient is connected to Server at IP Address = %s \t Port No : %d\n ", src, ntohs(addr.sin_port)); 
+        getsockname(sockfd, (struct sockaddr *)addr, &len);
+        inet_ntop(AF_INET, &addr->sin_addr, src, sizeof(src)); 
+        printf("\nClient is connected to Server at IP Address = %s \t Port No : %d\n ", src, ntohs(addr->sin_port)); 
 
         /* connect to client ip */
         bzero(&clientaddr, sizeof(clientaddr));
-        clientaddr.sin_family              = AF_INET;
-        clientaddr.sin_addr.s_addr         = htonl(client_addr.sin_addr.s_addr);
-        clientaddr.sin_port                = addr.sin_port;
+        clientaddr->sin_family              = AF_INET;
+        clientaddr->sin_addr.s_addr         = htonl(client_addr.sin_addr.s_addr);
+        clientaddr->sin_port                = addr->sin_port;
         if(connect(sockfd, (struct sockaddr *)&client_addr, sizeof(struct sockaddr))!=0) 
         {
                 printf("init_connection_socket: failed to connect to client\n");
@@ -95,7 +96,8 @@ int createNewConn (int isLocal, struct sockaddr_in client_addr, struct sockaddr_
 /* Forked server child for service requesting client */ 
 int childRequestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_in client_addr, char filename[496])
 {
-	int sockfd, isLocal;
+	printf ("Handling forked Child");
+	int sockfd, optval = -1, isLocal;
 	socklen_t len;
 	struct sockaddr_in	servaddr, clientaddr, addr;
 	char src[128], buf[512];
@@ -106,7 +108,45 @@ int childRequestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_in
 		if(head->sockfd == sock)
 		{
 			isLocal = checkLocal (head-> ifi_addr, head->ifi_ntmaddr, head->ifi_subnetaddr, client_addr);
-                        sockfd = createConn(isLocal, client_addr, clientaddr, servaddr, head);		 	
+        
+			if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
+			    err_sys("\nsocket creation error\n");
+
+			if(isLocal)
+			    if (setsockopt(sockfd, SOL_SOCKET, SO_DONTROUTE, &optval, sizeof(optval)) < 0)
+			    {
+				printf("\nerror : socket option error.\n");
+				close(sockfd);
+				exit(2);
+			    }
+
+			/* binding to the serv ip */
+			bzero(&servaddr, sizeof(servaddr));
+			servaddr.sin_family     	 = AF_INET;
+			servaddr.sin_addr.s_addr 	 = htonl(head->ifi_addr.sin_addr.s_addr);				
+			servaddr.sin_port        	 = htons(0);
+			if(bind(sockfd, (SA *) &servaddr, sizeof(servaddr))) 
+			{
+			    close(sockfd);
+			    err_sys("error in bind\n");
+			}
+			/* determining the port number */
+			len = sizeof(struct sockaddr);
+			bzero(&addr, sizeof(struct sockaddr_in));  
+			getsockname(sockfd, (struct sockaddr *)&addr, &len);
+			inet_ntop(AF_INET, &addr.sin_addr, src, sizeof(src)); 
+			printf("\nClient is connected to Server at IP Address = %s \t Port No : %d\n ", src, ntohs(addr.sin_port)); 
+
+			/* connect to client ip */
+			bzero(&clientaddr, sizeof(clientaddr));
+			clientaddr.sin_family              = AF_INET;
+			clientaddr.sin_addr.s_addr         = htonl(client_addr.sin_addr.s_addr);
+			clientaddr.sin_port                = addr.sin_port;
+			if(connect(sockfd, (struct sockaddr *)&client_addr, sizeof(struct sockaddr))!=0) 
+			{
+			    printf("init_connection_socket: failed to connect to client\n");
+			}
+                        //sockfd = createConn(isLocal, client_addr, &clientaddr, &servaddr, &addr, head);		 	
 		}
 		else
 		{	
@@ -220,7 +260,7 @@ void listenInterfaces(struct servStruct *servInfo)
 				else {
 					if ((pid = fork()) == 0)
                                         {
-//                                                printf("\nClient Request Handler forked .");
+                                                printf("\nClient Request Handler forked .");
 						childRequestHandler(head->sockfd, interfaceList, clientInfo, msg);
 						exit(0);
 					}
