@@ -138,10 +138,10 @@ int childRequestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_in
 			printf("\nClient is connected to Server at IP Address = %s \t Port No : %d\n ", src, ntohs(addr.sin_port)); 
 
 			/* connect to client ip */
-			bzero(&clientaddr, sizeof(clientaddr));
-			clientaddr.sin_family              = AF_INET;
-			clientaddr.sin_addr.s_addr         = htonl(client_addr.sin_addr.s_addr);
-			clientaddr.sin_port                = addr.sin_port;
+			//bzero(&clientaddr, sizeof(clientaddr));
+			//clientaddr.sin_family              = AF_INET;
+			//clientaddr.sin_addr.s_addr         = htonl(client_addr.sin_addr.s_addr);
+			//clientaddr.sin_port                = addr.sin_port;
 			if(connect(sockfd, (struct sockaddr *)&client_addr, sizeof(struct sockaddr))!=0) 
 			{
 			    printf("init_connection_socket: failed to connect to client\n");
