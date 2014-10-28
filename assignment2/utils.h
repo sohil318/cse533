@@ -4,7 +4,30 @@
 #include	"unp.h"
 #include	<net/if.h>
 
-/* Linklist of Interfaces */
+#define SYN_HS1         1
+#define ACK_HS2         2
+#define SYN_ACK_HS3     3
+#define WIN_UPDATE      4
+#define DATA_PAYLOAD    11
+#define DATA_ACK        12
+#define FIN             13
+#define FIN_ACK         14
+
+/* struct for a Frame/Message Header */
+typedef struct header   {
+        int msg_type;                                   /* Determine type of message    */
+        int seq_num;                                    /* sequence no/next expected seq no depending on msg_type */
+        int adv_window;                                 /* Advertising Window           */
+        int timestamp;                                  /* Time Stamp                   */
+}hdr;
+
+/* struct for message / frame */
+typedef struct message  {
+        hdr     *header;                                /* Structure to store header information */
+        char    payload[496];                           /* Actual Data bytes to be sent.         */
+}msg;
+
+/* struct for an Interface */
 typedef struct InterfaceInfo {
 	int			sockfd;                 /* socket file descriptor       */
         int                     mask;                   /* Subnet mask bits             */
@@ -14,12 +37,14 @@ typedef struct InterfaceInfo {
         struct InterfaceInfo	*ifi_next;	        /* next of these structures     */
 }interfaceInfo;
 
+/* struct for server Info */
 typedef struct servStruct {
 	struct InterfaceInfo	*ifi_head;
 	int 			serv_portNum;		/* Well know server port number */
 	int 			send_Window;		/* MaxSending sliding win size  */
 } servStruct;
 
+/* struct for client Info */
 typedef struct clientStruct {
 	struct sockaddr_in 	serv_addr;		/* IP address of server		 */
 	struct sockaddr_in 	cli_addr;		/* IP address of client		 */
