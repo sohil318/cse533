@@ -28,9 +28,24 @@ int checkLocal (struct sockaddr_in serverIP, struct sockaddr_in serverIPnmsk, st
 	
 }
 
+/* 
+ * Write file contents over the connection socket.
+ */
+
+void sendFile(int sockfd, char filename[496])
+{
+         char buf[496];
+         FILE *fp;
+
+         fp = fopen(filename, "r");
+         fread(buf, sizeof(buf[0]), 496, fp);
+	 write(sockfd, buf, sizeof(buf));        
+         printf("%s", buf);
+}
+
 
 /* Forked server child for service requesting client */ 
-int childRequestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_in client_addr)
+int childRequestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_in client_addr, char filename[496])
 {
 	int sockfd, isLocal, optval = -1;
 	socklen_t len;
@@ -86,7 +101,8 @@ int childRequestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_in
 		else
 		{	
 			/* Closing the other sockets*/
-			close(head->sockfd);
+	                if (close(head->sockfd) == -1)
+		                err_sys("close error");
 		}
 		head = head->ifi_next;
 	}
@@ -95,9 +111,11 @@ int childRequestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_in
 	sprintf(buf, "%d", addr.sin_port);
 	sendto(sock, buf, sizeof(buf), 0, (SA *)&client_addr, sizeof(client_addr));
 	read(sockfd, buf, sizeof(buf));
-	printf("\nReceived 3rd Hand Shake : %s", buf);
-	//char msg[] = "ACK: 3-Handshake";
-
+	if (close(sock) == -1)
+		err_sys("close error");
+        printf("\nReceived 3rd Hand Shake : %s", buf);
+        
+        sendFile(sockfd, filename);
 	//return ntohs(addr.sin_port);
 }
 
@@ -146,7 +164,7 @@ void listenInterfaces(struct servStruct *servInfo)
 	fd_set rset, allset;
 	socklen_t len;
 	
-        char msg[MAXLINE];
+        char msg[512];
 	char src[128];
 	
         int 	maxfdpl = -1, nready, pid;
@@ -193,7 +211,7 @@ void listenInterfaces(struct servStruct *servInfo)
 					if ((pid = fork()) == 0)
                                         {
 //                                                printf("\nClient Request Handler forked .");
-						childRequestHandler(head->sockfd, interfaceList, clientInfo);
+						childRequestHandler(head->sockfd, interfaceList, clientInfo, msg);
 						exit(0);
 					}
 					else

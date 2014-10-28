@@ -143,6 +143,17 @@ int createInitialConn(struct clientStruct **cliInfo, int isLocal)
 
 }
 
+/* 
+ * Read file contents over the network sent by the Reliable UDP Server.
+ */
+
+void recvFile(int sockfd)
+{
+         char recvmsg[496];
+         read(sockfd, recvmsg, sizeof(recvmsg));
+	 printf("File contents: %s \n", recvmsg);
+}
+
 int main(int argc, char **argv)
 {	
 	struct clientStruct  *clientInfo        =       loadClientInfo();
@@ -189,7 +200,10 @@ int main(int argc, char **argv)
 	/* Sending the 3-hand shake */
 	char msg[] = "ACK: 3-Handshake";
 	write(sockfd, msg, sizeof(msg));        
+        recvFile(sockfd);
 
-//	while (1);
 }
+
+
+
 
