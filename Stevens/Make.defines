@@ -6,12 +6,12 @@
 # The "../" in the pathnames actually refer to this directory, since
 # "make" is executed in all the subdirectories of this directory.
 #
-# System = x86_64-unknown-linux-gnu
+# System = sparc-sun-solaris2.10
 
 CC = gcc
-CFLAGS = -I../lib -g -O2 -D_REENTRANT -Wall
-LIBS = ../libunp.a -lpthread
-LIBS_XTI = ../libunpxti.a ../libunp.a -lpthread
+CFLAGS = -I../lib -g -O2 -D_REENTRANT -Wall -D__EXTENSIONS__
+LIBS = ../libunp.a -lresolv -lsocket -lnsl -lpthread
+LIBS_XTI = ../libunpxti.a ../libunp.a -lresolv  -lnsl -lpthread
 RANLIB = ranlib
 
 # Following is the main library, built from all the object files
@@ -35,7 +35,7 @@ LIBGAI_OBJS =
 LIBROUTE_OBJS = get_rtaddrs.o if_indextoname.o if_nameindex.o if_nametoindex.o net_rt_iflist.o net_rt_dump.o sock_masktop.o
 
 # Following are all the object files to create in the libxti/ directory.
-LIBXTI_OBJS =  wrapxti.o xti_accept.o xti_flags_str.o xti_getopt.o xti_ntop.o xti_ntop_host.o xti_rdwr.o xti_setopt.o xti_str_opts.o xti_tlook_str.o
+LIBXTI_OBJS =  tcp_connect.o tcp_listen.o udp_server.o udp_client.o wrapxti.o xti_accept.o xti_flags_str.o xti_getopt.o xti_ntop.o xti_ntop_host.o xti_rdwr.o xti_setopt.o xti_str_opts.o xti_tlook_str.o
 
 CLEANFILES = core core.* *.core *.o temp.* *.out typescript* \
 		*.lc *.lh *.bsdi *.sparc *.uw

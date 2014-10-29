@@ -16,10 +16,10 @@
 
 /* struct for a Frame/Message Header */
 typedef struct header   {
-        int msg_type;                                   /* Determine type of message    */
-        int seq_num;                                    /* sequence no/next expected seq no depending on msg_type */
-        int adv_window;                                 /* Advertising Window           */
-        int timestamp;                                  /* Time Stamp                   */
+        int msg_type;		                             /* Determine type of message			       */
+        int seq_num;		                             /* sequence no/next expected seq no depending on msg_type */
+        int adv_window;                                      /* Advertising Window				       */
+        uint32_t timestamp;                                  /* Time Stamp					       */
 }hdr;
 
 /* struct for message / frame */

@@ -229,6 +229,7 @@ void listenInterfaces(struct servStruct *servInfo)
 	fd_set rset, allset;
 	socklen_t len;
 	
+	struct msghdr recvmsg;
         char msg[512];
 	char src[128];
 	
@@ -264,11 +265,12 @@ void listenInterfaces(struct servStruct *servInfo)
 		while (head) {
 			if(FD_ISSET(head->sockfd, &rset)) {
 				len = sizeof(clientInfo);
-				recvfrom(head->sockfd, msg, MAXLINE, 0, (struct sockaddr *)&clientInfo, &len);
+				recvfrom(head->sockfd, (void *)&recvmsg, sizeof(struct msghdr), 0, (struct sockaddr *)&clientInfo, &len);
 				inet_ntop(AF_INET, &clientInfo.sin_addr, src, sizeof(src));
 				printf("\nClient Address  %s & port number %d ", src, clientInfo.sin_port);
-                                printf("\nFilename %s: \n", msg);
+                               // printf("\nFilename %s: \n", msg);
 				
+
                                 if( existing_connection(&clientInfo) == 1 ) { 
 					printf("Duplicate connection request!");
 				}
