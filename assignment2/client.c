@@ -1,5 +1,5 @@
 #include	 "utils.h"
-
+#include	 "unprtt.h"
 #define LOOPBACK "127.0.0.1"
 
 /*
@@ -205,11 +205,32 @@ int main(int argc, char **argv)
 	inet_ntop(AF_INET, &clientInfo->cli_addr.sin_addr, src, sizeof(src));
         printf("\nClient Address : %s",	src);
 */
+	sockfd = createInitialConn(&clientInfo, isLocal);  
 
-        sockfd = createInitialConn(&clientInfo, isLocal);
+	struct rtt_info rttinfo;
+	rtt_init(&rttinfo);
+	//rtt_newpack(&rttinfo);
+	char *payload = clientInfo->fileName;
 	struct msghdr sendmsg;
 	struct iovec iovecsend[2];
+        hdr header;
 
+	header.msg_type = SYN_HS1;
+	header.seq_num = 1;
+	header.adv_window = clientInfo->rec_Window;
+	header.timestamp = htonl(rtt_ts(&rttinfo));
+        iovecsend[0].iov_base = (void *)&header;
+	iovecsend[0].iov_len = sizeof(hdr);
+	iovecsend[1].iov_base = (void *)payload;
+	iovecsend[1].iov_len = sizeof(payload);
+	
+	sendmsg.msg_name = NULL;
+	sendmsg.msg_namelen = 0;
+	sendmsg.msg_iov = iovecsend;
+	sendmsg.msg_iovlen = 2;
+	
+//	sendmsg(sockfd, &sendmsg, sizeof(struct msghdr));
+	//write(sockfd, (void *)&sendmsg, sizeof(struct msghdr));
 	write(sockfd, clientInfo->fileName, sizeof(clientInfo->fileName));
 	
 	read(sockfd, recvBuff, sizeof(recvBuff));

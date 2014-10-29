@@ -2,7 +2,7 @@
 /* config.h.in.  Generated from configure.in by autoheader.  */
 
 /* CPU, vendor, and operating system */
-#define CPU_VENDOR_OS "x86_64-unknown-linux-gnu"
+#define CPU_VENDOR_OS "sparc-sun-solaris2.10"
 
 /* Define to 1 if <netdb.h> defines struct addrinfo */
 #define HAVE_ADDRINFO_STRUCT 1
@@ -17,7 +17,7 @@
 /* #undef HAVE_DEV_STREAMS_XTISO_TCP */
 
 /* Define to 1 if the /dev/tcp device exists */
-/* #undef HAVE_DEV_TCP */
+#define HAVE_DEV_TCP 1
 
 /* Define to 1 if the /dev/xti/tcp device exists */
 /* #undef HAVE_DEV_XTI_TCP */
@@ -35,7 +35,7 @@
 #define HAVE_GETADDRINFO_PROTO 1
 
 /* Define to 1 if you have the `gethostbyname2' function. */
-#define HAVE_GETHOSTBYNAME2 1
+/* #undef HAVE_GETHOSTBYNAME2 */
 
 /* Define to 1 if you have the `gethostbyname_r' function. */
 #define HAVE_GETHOSTBYNAME_R 1
@@ -92,7 +92,7 @@
 /* #undef HAVE_KQUEUE */
 
 /* Define to 1 if you have the `nsl' library (-lnsl). */
-/* #undef HAVE_LIBNSL */
+#define HAVE_LIBNSL 1
 
 /* Define to 1 if you have the `pthread' library (-lpthread). */
 #define HAVE_LIBPTHREAD 1
@@ -101,7 +101,7 @@
 /* #undef HAVE_LIBPTHREADS */
 
 /* Define to 1 if you have the `resolv' library (-lresolv). */
-/* #undef HAVE_LIBRESOLV */
+#define HAVE_LIBRESOLV 1
 
 /* Define to 1 if you have the `xti' library (-lxti). */
 /* #undef HAVE_LIBXTI */
@@ -110,22 +110,22 @@
 #define HAVE_MKSTEMP 1
 
 /* define if struct msghdr contains the msg_control member */
-#define HAVE_MSGHDR_MSG_CONTROL 1
+/* #undef HAVE_MSGHDR_MSG_CONTROL */
 
 /* Define to 1 if you have the <netconfig.h> header file. */
-/* #undef HAVE_NETCONFIG_H */
+#define HAVE_NETCONFIG_H 1
 
 /* Define to 1 if you have the <netdb.h> header file. */
 #define HAVE_NETDB_H 1
 
 /* Define to 1 if you have the <netdir.h> header file. */
-/* #undef HAVE_NETDIR_H */
+#define HAVE_NETDIR_H 1
 
 /* Define to 1 if you have the <netinet/in.h> header file. */
 #define HAVE_NETINET_IN_H 1
 
 /* Define to 1 if you have the <net/if_dl.h> header file. */
-/* #undef HAVE_NET_IF_DL_H */
+#define HAVE_NET_IF_DL_H 1
 
 /* Define to 1 if you have the `poll' function. */
 #define HAVE_POLL 1
@@ -152,7 +152,7 @@
 #define HAVE_SNPRINTF_PROTO 1
 
 /* Define to 1 if <net/if_dl.h> defines struct sockaddr_dl */
-/* #undef HAVE_SOCKADDR_DL_STRUCT */
+#define HAVE_SOCKADDR_DL_STRUCT 1
 
 /* define if socket address structures have length fields */
 /* #undef HAVE_SOCKADDR_SA_LEN */
@@ -179,7 +179,7 @@
 #define HAVE_STROPTS_H 1
 
 /* Define to 1 if `ifr_mtu' is member of `struct ifreq'. */
-#define HAVE_STRUCT_IFREQ_IFR_MTU 1
+/* #undef HAVE_STRUCT_IFREQ_IFR_MTU */
 
 /* Define to 1 if the system has the type `struct sockaddr_storage'. */
 #define HAVE_STRUCT_SOCKADDR_STORAGE 1
@@ -188,7 +188,7 @@
 /* #undef HAVE_SYS_EVENT_H */
 
 /* Define to 1 if you have the <sys/filio.h> header file. */
-/* #undef HAVE_SYS_FILIO_H */
+#define HAVE_SYS_FILIO_H 1
 
 /* Define to 1 if you have the <sys/ioctl.h> header file. */
 #define HAVE_SYS_IOCTL_H 1
@@ -203,13 +203,13 @@
 #define HAVE_SYS_SOCKET_H 1
 
 /* Define to 1 if you have the <sys/sockio.h> header file. */
-/* #undef HAVE_SYS_SOCKIO_H */
+#define HAVE_SYS_SOCKIO_H 1
 
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #define HAVE_SYS_STAT_H 1
 
 /* Define to 1 if you have the <sys/sysctl.h> header file. */
-#define HAVE_SYS_SYSCTL_H 1
+/* #undef HAVE_SYS_SYSCTL_H */
 
 /* Define to 1 if you have the <sys/time.h> header file. */
 #define HAVE_SYS_TIME_H 1
@@ -239,10 +239,10 @@
 #define HAVE_VSNPRINTF 1
 
 /* Define to 1 if you have the <xti.h> header file. */
-/* #undef HAVE_XTI_H */
+#define HAVE_XTI_H 1
 
 /* Define to 1 if you have the <xti_inet.h> header file. */
-/* #undef HAVE_XTI_INET_H */
+#define HAVE_XTI_INET_H 1
 
 /* Define to 1 if the system supports IPv4 */
 #define IPV4 1
@@ -311,7 +311,7 @@
 /* #undef ssize_t */
 
 /* scalar type */
-#define t_scalar_t int32_t
+/* #undef t_scalar_t */
 
 /* unsigned scalar type */
 /* #undef t_uscalar_t */
