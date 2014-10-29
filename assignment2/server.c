@@ -31,28 +31,42 @@ int checkLocal (struct sockaddr_in serverIP, struct sockaddr_in serverIPnmsk, st
 void sendFile(int sockfd, char filename[496])
 {
          char buf[PAYLOAD_CHUNK_SIZE];
-         FILE *fp;
-	 int seqNum = 3;
-	 hdr *header;
-	 struct msghdr *msgsend;
+         int fp;
+	 int seqnum = 3, nbytes;
+	 hdr header;
+	 struct msghdr datamsg;
+	 struct iovec dataiovec[2];
 	
-         fp = fopen(filename, "r");
-         while (fread(buf, sizeof(buf[0]), PAYLOAD_CHUNK_SIZE-1, fp))
+         fp = open(filename, O_RDONLY, S_IREAD);
+         while ((nbytes = read(fp, buf, PAYLOAD_CHUNK_SIZE-1)) <= PAYLOAD_CHUNK_SIZE-1)
 	 { 
-	    buf[PAYLOAD_CHUNK_SIZE-1] = '\0';
-	    header = (hdr *)createHeader(DATA_PAYLOAD, seqNum, 0, 0);
-//	    printf("\nCheck Header Completed\n");
-	    msgsend = (struct msghdr *)createDataPacket(header, buf, PAYLOAD_CHUNK_SIZE);
-	    printf("\nData Recieved using recvmsg: %d\n", ((hdr *)msgsend->msg_iov[0].iov_base)->msg_type);
-	    printf("\nInfo data: %s ", msgsend->msg_iov[1].iov_base);
-	    printf("\nInfo len : %d ", msgsend->msg_iov[1].iov_len);
-	    sendmsg(sockfd, msgsend, sizeof(struct msghdr));
-	    seqNum++;
+	    buf[nbytes] = '\0';
+//	    printf("\nBuf : %s", buf);
+	    if (nbytes < PAYLOAD_CHUNK_SIZE - 1)
+		header.msg_type        = FIN;
+	    else
+		header.msg_type        = DATA_PAYLOAD;
+	    header.seq_num         = seqnum;
+	    header.adv_window      = 0;
+	    header.timestamp       = 0;
+	    
+	    datamsg.msg_name       = NULL;
+	    datamsg.msg_namelen    = 0;
+	    datamsg.msg_iov        = dataiovec;
+	    datamsg.msg_iovlen     = 2;
+
+	    dataiovec[0].iov_base   = (void *)&header;
+	    dataiovec[0].iov_len    = sizeof(hdr);
+	    dataiovec[1].iov_base   = (void *)buf;
+	    dataiovec[1].iov_len    = PAYLOAD_CHUNK_SIZE;
+	    
+	    sendmsg(sockfd, &datamsg, sizeof(struct msghdr));
+	    seqnum++;
+	    if (header.msg_type == FIN)
+		break;
 	    bzero(&buf, PAYLOAD_CHUNK_SIZE);                                                                                                                                  
 	    bzero(&header, sizeof(hdr));
-	    bzero(msgsend, sizeof(msgsend));
-	    fseek(fp, 495,SEEK_CUR);
-
+	    bzero(&datamsg, sizeof(datamsg));
          }
 	 //printf("%s", buf);
 }
