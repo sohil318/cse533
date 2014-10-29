@@ -30,14 +30,29 @@ int checkLocal (struct sockaddr_in serverIP, struct sockaddr_in serverIPnmsk, st
 
 void sendFile(int sockfd, char filename[496])
 {
-         char buf[496];
+         char buf[PAYLOAD_CHUNK_SIZE];
          FILE *fp;
-
+	 int seqNum = 3;
+	 hdr *header;
+	 struct msghdr *msgsend;
+	
          fp = fopen(filename, "r");
-         while (fread(buf, sizeof(buf[0]), 496, fp))
-	 {
-	    fseek(fp, 496,SEEK_CUR);
-	    write(sockfd, buf, sizeof(buf));        
+         while (fread(buf, sizeof(buf[0]), PAYLOAD_CHUNK_SIZE-1, fp))
+	 { 
+	    buf[PAYLOAD_CHUNK_SIZE-1] = '\0';
+	    header = (hdr *)createHeader(DATA_PAYLOAD, seqNum, 0, 0);
+//	    printf("\nCheck Header Completed\n");
+	    msgsend = (struct msghdr *)createDataPacket(header, buf, PAYLOAD_CHUNK_SIZE);
+	    printf("\nData Recieved using recvmsg: %d\n", ((hdr *)msgsend->msg_iov[0].iov_base)->msg_type);
+	    printf("\nInfo data: %s ", msgsend->msg_iov[1].iov_base);
+	    printf("\nInfo len : %d ", msgsend->msg_iov[1].iov_len);
+	    sendmsg(sockfd, msgsend, sizeof(struct msghdr));
+	    seqNum++;
+	    bzero(&buf, PAYLOAD_CHUNK_SIZE);                                                                                                                                  
+	    bzero(&header, sizeof(hdr));
+	    bzero(msgsend, sizeof(msgsend));
+	    fseek(fp, 495,SEEK_CUR);
+
          }
 	 //printf("%s", buf);
 }

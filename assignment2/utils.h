@@ -4,14 +4,15 @@
 #include	"unp.h"
 #include	<net/if.h>
 
-#define SYN_HS1         1
-#define ACK_HS2         2
-#define SYN_ACK_HS3     3
-#define WIN_UPDATE      4
-#define DATA_PAYLOAD    11
-#define DATA_ACK        12
-#define FIN             13
-#define FIN_ACK         14
+#define SYN_HS1		    1
+#define ACK_HS2		    2
+#define SYN_ACK_HS3	    3
+#define WIN_UPDATE	    4
+#define DATA_PAYLOAD	    11
+#define DATA_ACK	    12
+#define FIN		    13
+#define FIN_ACK		    14
+#define PAYLOAD_CHUNK_SIZE  496
 
 /* struct for a Frame/Message Header */
 typedef struct header   {
@@ -72,9 +73,10 @@ interfaceInfo * get_interfaces_client();
 interfaceInfo * get_interfaces_server(int portno);
 servStruct * loadServerInfo();
 clientStruct * loadClientInfo();
+
 hdr* createHeader(int msgtype, int seqnum, int advwin, int ts);
-struct msghdr* createDataPacket(hdr *dataheader , char *data, int datalen);
-struct msghdr* createAckPacket(hdr *ackheader);
+struct msghdr* createDataPacket(hdr* dataheader , char *data, int datalen);
+struct msghdr createAckPacket(hdr ackheader);
 
 
 #endif	/* __utils_h */

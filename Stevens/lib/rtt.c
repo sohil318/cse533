@@ -80,9 +80,9 @@ rtt_start(struct rtt_info *ptr)
 void
 rtt_stop(struct rtt_info *ptr, uint32_t ms)
 {
-	double		delta;
+	uint32_t      delta;
 
-	ptr->rtt_rtt = ms / 1000.0;		/* measured RTT in seconds */
+	ptr->rtt_rtt = ms / 1000;		/* measured RTT in seconds */
 
 	/*
 	 * Update our estimators of RTT and mean deviation of RTT.
@@ -93,7 +93,7 @@ rtt_stop(struct rtt_info *ptr, uint32_t ms)
 	delta = ptr->rtt_rtt - ptr->rtt_srtt;
 	ptr->rtt_srtt += delta / 8;		/* g = 1/8 */
 
-	if (delta < 0.0)
+	if (delta < 0)
 		delta = -delta;				/* |delta| */
 
 	ptr->rtt_rttvar += (delta - ptr->rtt_rttvar) / 4;	/* h = 1/4 */

@@ -149,13 +149,40 @@ int createInitialConn(struct clientStruct **cliInfo, int isLocal)
 
 void recvFile(int sockfd)
 {
-	char recvmsg[496];
-	printf("File contents: %s \n", recvmsg);
-        while (1)
-	{
-	    read(sockfd, recvmsg, sizeof(recvmsg));
-	    printf("%s", recvmsg);
-         }
+	struct msghdr *msgrecv;
+	struct iovec iovrec[2];
+	char *data;
+	hdr *header;
+	header = (hdr *)malloc(sizeof(hdr));
+	msgrecv = (struct msghdr *)malloc(sizeof(struct msghdr));
+	char payBuff[PAYLOAD_CHUNK_SIZE];
+	
+	iovrec[0].iov_len = sizeof(hdr);
+	iovrec[0].iov_base = (void *)header;
+	iovrec[1].iov_len = PAYLOAD_CHUNK_SIZE;
+	iovrec[1].iov_base = payBuff;
+	//header.seq_num = 496;	
+	msgrecv->msg_name = NULL;
+	msgrecv->msg_namelen = 0;
+        msgrecv->msg_iov = iovrec;
+	msgrecv->msg_iovlen = 2;
+	
+	//while (1)
+	//{
+	    bzero(msgrecv, sizeof(struct msghdr));
+	    //bzero(header, sizeof(hdr));
+	    //bzero(&payBuff, PAYLOAD_CHUNK_SIZE);
+	    recvmsg(sockfd, msgrecv, 0);
+	    header = (hdr *)msgrecv->msg_iov[0].iov_base;
+	//    printf("\nData Recieved using recvmsg: %d\n", header->msg_type);
+	    printf("\nData Recieved using recvmsg: %d\n", msgrecv->msg_iov[1].iov_len);
+	    //printf("%s\n", payBuff);/*
+	    /*iovrec[0] = (struct iovec)msgrecv->msg_iov[0];
+	    header = (hdr *)iovrec[0].iov_base;
+	    
+	    printf("msg type recieved: %d\n", header->msg_type);
+	    printf("sequence Number recieved: %d \n", header->seq_num);
+         *///}
 }
 
 int main(int argc, char **argv)
@@ -187,7 +214,10 @@ int main(int argc, char **argv)
 */
 
         sockfd = createInitialConn(&clientInfo, isLocal);
-        write(sockfd, clientInfo->fileName, sizeof(clientInfo->fileName));
+	struct msghdr sendmsg;
+	struct iovec iovecsend[2];
+
+	write(sockfd, clientInfo->fileName, sizeof(clientInfo->fileName));
 	
 	read(sockfd, recvBuff, sizeof(recvBuff));
 	printf("New port number recieved from Server : %d \n", ntohs(atoi(recvBuff)));
@@ -204,8 +234,8 @@ int main(int argc, char **argv)
 	/* Sending the 3-hand shake */
 	char msg[] = "ACK: 3-Handshake";
 	write(sockfd, msg, sizeof(msg));        
-        recvFile(sockfd);
-
+	recvFile(sockfd);
+    
 }
 
 
