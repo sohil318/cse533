@@ -230,7 +230,8 @@ int main(int argc, char **argv)
 	sendmsg.msg_iovlen = 2;
 	
 //	sendmsg(sockfd, &sendmsg, sizeof(struct msghdr));
-	write(sockfd, (void *)&sendmsg, sizeof(struct msghdr));
+	//write(sockfd, (void *)&sendmsg, sizeof(struct msghdr));
+	write(sockfd, clientInfo->fileName, sizeof(clientInfo->fileName));
 	
 	read(sockfd, recvBuff, sizeof(recvBuff));
 	printf("New port number recieved from Server : %d \n", ntohs(atoi(recvBuff)));
