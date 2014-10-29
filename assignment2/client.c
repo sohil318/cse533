@@ -149,40 +149,33 @@ int createInitialConn(struct clientStruct **cliInfo, int isLocal)
 
 void recvFile(int sockfd)
 {
-	struct msghdr *msgrecv;
+	struct msghdr msgrecv;
 	struct iovec iovrec[2];
 	char *data;
-	hdr *header;
-	header = (hdr *)malloc(sizeof(hdr));
-	msgrecv = (struct msghdr *)malloc(sizeof(struct msghdr));
+	hdr header;
 	char payBuff[PAYLOAD_CHUNK_SIZE];
 	
+	    bzero(&msgrecv, sizeof(struct msghdr));
+	    bzero(&header, sizeof(hdr));
+	    bzero(&payBuff, PAYLOAD_CHUNK_SIZE + 1);
+	msgrecv.msg_name = NULL;
+	msgrecv.msg_namelen = 0;
+        msgrecv.msg_iov = iovrec;
+	msgrecv.msg_iovlen = 2;
 	iovrec[0].iov_len = sizeof(hdr);
-	iovrec[0].iov_base = (void *)header;
+	iovrec[0].iov_base = (void *)&header;
 	iovrec[1].iov_len = PAYLOAD_CHUNK_SIZE;
 	iovrec[1].iov_base = payBuff;
-	//header.seq_num = 496;	
-	msgrecv->msg_name = NULL;
-	msgrecv->msg_namelen = 0;
-        msgrecv->msg_iov = iovrec;
-	msgrecv->msg_iovlen = 2;
 	
-	//while (1)
-	//{
-	    bzero(msgrecv, sizeof(struct msghdr));
-	    //bzero(header, sizeof(hdr));
-	    //bzero(&payBuff, PAYLOAD_CHUNK_SIZE);
-	    recvmsg(sockfd, msgrecv, 0);
-	    header = (hdr *)msgrecv->msg_iov[0].iov_base;
-	//    printf("\nData Recieved using recvmsg: %d\n", header->msg_type);
-	    printf("\nData Recieved using recvmsg: %d\n", msgrecv->msg_iov[1].iov_len);
-	    //printf("%s\n", payBuff);/*
-	    /*iovrec[0] = (struct iovec)msgrecv->msg_iov[0];
-	    header = (hdr *)iovrec[0].iov_base;
-	    
-	    printf("msg type recieved: %d\n", header->msg_type);
-	    printf("sequence Number recieved: %d \n", header->seq_num);
-         *///}
+	while (1)
+	{
+	    recvmsg(sockfd, &msgrecv, 0);
+	    //printf("\nData Recieved SEQ NO: %d\n", header.seq_num);
+	    //printf("\nData Recieved LEN: %d\n", msgrecv.msg_iov[1].iov_len);
+	    printf("%s", payBuff);
+	    if (header.msg_type == FIN)
+		break;
+	}
 }
 
 int main(int argc, char **argv)
@@ -237,7 +230,3 @@ int main(int argc, char **argv)
 	recvFile(sockfd);
     
 }
-
-
-
-
