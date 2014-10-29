@@ -60,7 +60,7 @@ void sendFile(int sockfd, char filename[496])
 	    dataiovec[1].iov_base   = (void *)buf;
 	    dataiovec[1].iov_len    = PAYLOAD_CHUNK_SIZE;
 	    
-	    sendmsg(sockfd, &datamsg, sizeof(struct msghdr));
+	    sendmsg(sockfd, &datamsg, 0);
 	    seqnum++;
 	    if (header.msg_type == FIN)
 		break;
