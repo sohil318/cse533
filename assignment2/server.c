@@ -298,6 +298,10 @@ void listenInterfaces(struct servStruct *servInfo)
 					}
 					else
 					{
+						sigset_t signal_set;
+						sigemptyset(&signal_set);
+						sigaddset(&signal_set, SIGCHLD);
+						sigprocmask(SIG_BLOCK, &signal_set, NULL);
 						struct existing_connections *new_conn;
 						new_conn = (struct existing_connections *)malloc(sizeof(struct existing_connections));
 						new_conn->client_addr.sin_addr.s_addr = clientInfo.sin_addr.s_addr;
@@ -307,6 +311,7 @@ void listenInterfaces(struct servStruct *servInfo)
 						new_conn->next_connection = existing_conn;
 						existing_conn = new_conn;
 //						printf("\nelse to be done");
+						sigprocmask(SIG_UNBLOCK, &signal_set, NULL);
 					}
 				}
 			}
