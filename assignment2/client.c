@@ -147,33 +147,16 @@ int createInitialConn(struct clientStruct **cliInfo, int isLocal)
  * Read file contents over the network sent by the Reliable UDP Server.
  */
 
-void recvFile(int sockfd)
+void recvFile(int sockfd, struct sockaddr_in serverInfo)
 {
-	struct msghdr msgrecv;
-	struct iovec iovrec[2];
-	char *data;
-	hdr header;
-	char payBuff[PAYLOAD_CHUNK_SIZE];
-	
-	    bzero(&msgrecv, sizeof(struct msghdr));
-	    bzero(&header, sizeof(hdr));
-	    bzero(&payBuff, PAYLOAD_CHUNK_SIZE + 1);
-	msgrecv.msg_name = NULL;
-	msgrecv.msg_namelen = 0;
-        msgrecv.msg_iov = iovrec;
-	msgrecv.msg_iovlen = 2;
-	iovrec[0].iov_len = sizeof(hdr);
-	iovrec[0].iov_base = (void *)&header;
-	iovrec[1].iov_len = PAYLOAD_CHUNK_SIZE;
-	iovrec[1].iov_base = payBuff;
-	
+	msg m;
+	printf("\nData Received on Client : ");
 	while (1)
 	{
-	    recvmsg(sockfd, &msgrecv, 0);
-	    //printf("\nData Recieved SEQ NO: %d\n", header.seq_num);
-	    //printf("\nData Recieved LEN: %d\n", msgrecv.msg_iov[1].iov_len);
-	    printf("%s", payBuff);
-	    if (header.msg_type == FIN)
+	    recv(sockfd, &m, sizeof(m), 0);
+	    printf("%s", m.payload);
+	    //printf("%s", payBuff);
+	    if (m.header.msg_type == FIN)
 		break;
 	}
 }
@@ -181,7 +164,7 @@ void recvFile(int sockfd)
 int main(int argc, char **argv)
 {	
 	struct clientStruct  *clientInfo        =       loadClientInfo();
-        int isLocal, sockfd;
+        int isLocal, sockfd, advwin = 0, ts = 0;
 	char src[128];
 	char recvBuff[1024];	
 	struct sockaddr_in servIP;	
@@ -210,28 +193,16 @@ int main(int argc, char **argv)
 	struct rtt_info rttinfo;
 	rtt_init(&rttinfo);
 	//rtt_newpack(&rttinfo);
-	char *payload = clientInfo->fileName;
-	struct msghdr sendmsg;
-	struct iovec iovecsend[2];
+	msg pack_1HS;
         hdr header;
 
-	header.msg_type = SYN_HS1;
-	header.seq_num = 1;
-	header.adv_window = clientInfo->rec_Window;
-	header.timestamp = htonl(rtt_ts(&rttinfo));
-        iovecsend[0].iov_base = (void *)&header;
-	iovecsend[0].iov_len = sizeof(hdr);
-	iovecsend[1].iov_base = (void *)payload;
-	iovecsend[1].iov_len = sizeof(payload);
+	createHeader(&header, SYN_HS1, 1, advwin, ts);
+        createMsgPacket(&pack_1HS, header, clientInfo->fileName, sizeof(clientInfo->fileName));
 	
-	sendmsg.msg_name = NULL;
-	sendmsg.msg_namelen = 0;
-	sendmsg.msg_iov = iovecsend;
-	sendmsg.msg_iovlen = 2;
 	
 //	sendmsg(sockfd, &sendmsg, sizeof(struct msghdr));
 	//write(sockfd, (void *)&sendmsg, sizeof(struct msghdr));
-	write(sockfd, clientInfo->fileName, sizeof(clientInfo->fileName));
+	write(sockfd, &pack_1HS, sizeof(pack_1HS));
 	
 	read(sockfd, recvBuff, sizeof(recvBuff));
 	printf("New port number recieved from Server : %d \n", ntohs(atoi(recvBuff)));
@@ -248,6 +219,6 @@ int main(int argc, char **argv)
 	/* Sending the 3-hand shake */
 	char msg[] = "ACK: 3-Handshake";
 	write(sockfd, msg, sizeof(msg));        
-	recvFile(sockfd);
+	recvFile(sockfd, servIP);
     
 }
