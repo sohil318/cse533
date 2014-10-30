@@ -28,14 +28,13 @@ int checkLocal (struct sockaddr_in serverIP, struct sockaddr_in serverIPnmsk, st
  * Write file contents over the connection socket.
  */
 
-void sendFile(int sockfd, char filename[496])
+void sendFile(int sockfd, char filename[496], struct sockaddr_in client_addr)
 {
          char buf[PAYLOAD_CHUNK_SIZE];
          int fp;
-	 int seqnum = 3, nbytes;
+	 int seqnum = 3, nbytes, advwin = 0, ts = 0, msgtype;
 	 hdr header;
-	 struct msghdr datamsg;
-	 struct iovec dataiovec[2];
+	 msg datapacket;
 	
          fp = open(filename, O_RDONLY, S_IREAD);
          while ((nbytes = read(fp, buf, PAYLOAD_CHUNK_SIZE-1)) <= PAYLOAD_CHUNK_SIZE-1)
@@ -43,32 +42,20 @@ void sendFile(int sockfd, char filename[496])
 	    buf[nbytes] = '\0';
 	    //printf("\nBuf : %s", buf);
 	    if (nbytes < PAYLOAD_CHUNK_SIZE - 1)
-		header.msg_type        = FIN;
+		msgtype        = FIN;
 	    else
-		header.msg_type        = DATA_PAYLOAD;
-	    header.seq_num         = seqnum;
-	    header.adv_window      = 0;
-	    header.timestamp       = 0;
+		msgtype        = DATA_PAYLOAD;
 	    
-	    datamsg.msg_name       = NULL;
-	    datamsg.msg_namelen    = 0;
-	    datamsg.msg_iov        = dataiovec;
-	    datamsg.msg_iovlen     = 2;
-
-	    dataiovec[0].iov_base   = (void *)&header;
-	    dataiovec[0].iov_len    = sizeof(hdr);
-	    dataiovec[1].iov_base   = (void *)buf;
-	    dataiovec[1].iov_len    = PAYLOAD_CHUNK_SIZE;
+	    createHeader(&header, msgtype, seqnum, advwin, ts);
+	    createMsgPacket(&datapacket, header, buf, nbytes+1);
 	    
-	    sendmsg(sockfd, &datamsg, 0);
+	    send(sockfd, &datapacket, sizeof(datapacket), 0);
 	    seqnum++;
-	    if (header.msg_type == FIN)
+	    if (msgtype == FIN)
 		break;
-	    bzero(&buf, PAYLOAD_CHUNK_SIZE);                                                                                                                                  
-	    bzero(&header, sizeof(hdr));
-	    bzero(&datamsg, sizeof(datamsg));
+	    bzero(&buf, PAYLOAD_CHUNK_SIZE);
+	    bzero(&datapacket, sizeof(datapacket));
          }
-	 //printf("%s", buf);
 }
 
 
@@ -125,8 +112,8 @@ int createConn(int isLocal, struct sockaddr_in client_addr, struct sockaddr_in *
 /* Forked server child for service requesting client */ 
 int childRequestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_in client_addr, char filename[496])
 {
-	printf ("Handling forked Child");
-	int sockfd, optval = -1, isLocal;
+	//printf ("Handling forked Child");
+	int sockfd, optval = -1, isLocal, newport;
 	socklen_t len;
 	struct sockaddr_in	servaddr, clientaddr, addr;
 	char src[128], buf[512];
@@ -164,17 +151,19 @@ int childRequestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_in
 			bzero(&addr, sizeof(struct sockaddr_in));  
 			getsockname(sockfd, (struct sockaddr *)&addr, &len);
 			inet_ntop(AF_INET, &addr.sin_addr, src, sizeof(src)); 
-			printf("\nClient is connected to Server at IP Address = %s \t Port No : %d\n ", src, ntohs(addr.sin_port)); 
+			newport = addr.sin_port;
+			printf("\n\nClient : IP Address = %s \t Port No : %d ", src, ntohs(addr.sin_port)); 
+			
 
 			/* connect to client ip */
-			//bzero(&clientaddr, sizeof(clientaddr));
-			//clientaddr.sin_family              = AF_INET;
-			//clientaddr.sin_addr.s_addr         = htonl(client_addr.sin_addr.s_addr);
-			//clientaddr.sin_port                = addr.sin_port;
 			if(connect(sockfd, (struct sockaddr *)&client_addr, sizeof(struct sockaddr))!=0) 
 			{
 			    printf("init_connection_socket: failed to connect to client\n");
 			}
+			bzero(&addr, sizeof(struct sockaddr_in));  
+			getpeername(sockfd, (struct sockaddr *)&addr, &len);
+			inet_ntop(AF_INET, &addr.sin_addr, src, sizeof(src)); 
+			printf("\nServer : IP Address = %s \t Port No : %d\n ", src, ntohs(addr.sin_port)); 
                         //sockfd = createConn(isLocal, client_addr, &clientaddr, &servaddr, &addr, head);		 	
 		}
 		else
@@ -187,14 +176,14 @@ int childRequestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_in
 	}
 
 	/* Send new connection socket to client */
-	sprintf(buf, "%d", addr.sin_port);
+	sprintf(buf, "%d", newport);
 	sendto(sock, buf, sizeof(buf), 0, (SA *)&client_addr, sizeof(client_addr));
 	read(sockfd, buf, sizeof(buf));
 	if (close(sock) == -1)
 		err_sys("close error");
         printf("\nReceived 3rd Hand Shake : %s", buf);
         
-        sendFile(sockfd, filename);
+        sendFile(sockfd, filename, client_addr);
 	//return ntohs(addr.sin_port);
 }
 
@@ -282,8 +271,8 @@ void listenInterfaces(struct servStruct *servInfo)
 				recvfrom(head->sockfd, msg, sizeof(msg), 0, (struct sockaddr *)&clientInfo, &len);
 				//recvfrom(head->sockfd, (void *)&recvmsg, sizeof(struct msghdr), 0, (struct sockaddr *)&clientInfo, &len);
 				inet_ntop(AF_INET, &clientInfo.sin_addr, src, sizeof(src));
-				printf("\nClient Address  %s & port number %d ", src, clientInfo.sin_port);
-                                printf("\nFilename %s: \n", msg);
+//				printf("\nClient Address  %s & port number %d ", src, clientInfo.sin_port);
+                                printf("\nFilename requested for transfer : %s \n", msg);
 				
 
                                 if( existing_connection(&clientInfo) == 1 ) { 
@@ -292,7 +281,7 @@ void listenInterfaces(struct servStruct *servInfo)
 				else {
 					if ((pid = fork()) == 0)
                                         {
-                                                printf("\nClient Request Handler forked .");
+//                                                printf("\nClient Request Handler forked .");
 						childRequestHandler(head->sockfd, interfaceList, clientInfo, msg);
 						exit(0);
 					}

@@ -207,82 +207,26 @@ clientStruct * loadClientInfo()
         return clientInfo;
 }
 
-hdr* createHeader(int msgtype, int seqnum, int advwin, int ts)
+/*
+ * Function to create message header
+ */
+
+void createHeader(hdr *header, int msg_type, int seqnum, int advwin, int ts)
 {
-        hdr *header;
-	header = (hdr *)malloc(sizeof(hdr));
-        header->msg_type        = msgtype;
-        header->seq_num         = seqnum;
-        header->adv_window      = advwin;
-        header->timestamp       = ts;
-        return header;
+    header->msg_type        = msg_type;
+    header->seq_num         = seqnum;
+    header->adv_window      = advwin;
+    header->timestamp       = ts; 
 }
 
-struct msghdr* createDataPacket(hdr *dataheader, char *data, int datalen)
+/*
+ * Function to create Data Packet
+ */
+
+void createMsgPacket(msg *datapack, hdr header, char *buf, int len)
 {
-        struct msghdr *datamsg;
-	datamsg = (struct msghdr *) malloc (sizeof(struct msghdr));
-        struct iovec dataiovec[2];
-
-//	printf("\nCreated Packet \n"); //iovec[1].iov_base);
-        bzero(datamsg, sizeof(struct msghdr));
-        datamsg->msg_name       = NULL;
-        datamsg->msg_namelen    = 0;
-        datamsg->msg_iov        = dataiovec;
-        datamsg->msg_iovlen     = 2;
-
-        dataiovec[0].iov_base   = (void *)dataheader;
-        dataiovec[0].iov_len    = sizeof(hdr);
-        dataiovec[1].iov_base   = data;
-	printf("\nCreated Packet %s\n", dataiovec[1].iov_base);
-        dataiovec[1].iov_len    = datalen;
-	printf("\nCreated Packet %d\n", dataiovec[1].iov_len);
-
-        return datamsg;
+    datapack->header       = header;
+    strncpy(datapack->payload, buf, len);
+    datapack->len	   = len;
 }
 
-struct msghdr createAckPacket(hdr ackheader)
-{
-        struct msghdr ackmsg;
-        struct iovec ackiovec[1];
-
-        bzero(&ackmsg, sizeof(struct msghdr));
-        ackmsg.msg_name       = NULL;
-        ackmsg.msg_namelen    = 0;
-        ackmsg.msg_iov        = ackiovec;
-        ackmsg.msg_iovlen     = 1;
-
-        ackiovec[0].iov_base   = (void *)&ackheader;
-        ackiovec[0].iov_len    = sizeof(ackheader);
-
-        return ackmsg;
-}
-
-hdr* readHeader(struct msghdr *messageHeader)
-{
-	hdr *header;
-	struct iovec headeriovec[1];
-
-	if(messageHeader->msg_iov[0].iov_base != NULL) {
-	    headeriovec[0] = messageHeader->msg_iov[0];
-	    header = (hdr *)headeriovec[0].iov_base;
-	}
-	else {
-	    printf("\n readHeader : Header is NULL\n");
-	    return;
-	}
-	return header;
-}
-
-void* readData(struct msghdr *messageHeader)
-{
-	struct iovec dataiovec[1];
-	if(messageHeader->msg_iov[1].iov_base){
-	    dataiovec[1] = messageHeader->msg_iov[1];
-	    return dataiovec[1].iov_base;
-	} 
-	else{
-	    printf("\n readData : payloadNULL in msghdr \n");
-	    return;
-	}
-}

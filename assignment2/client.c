@@ -147,33 +147,16 @@ int createInitialConn(struct clientStruct **cliInfo, int isLocal)
  * Read file contents over the network sent by the Reliable UDP Server.
  */
 
-void recvFile(int sockfd)
+void recvFile(int sockfd, struct sockaddr_in serverInfo)
 {
-	struct msghdr msgrecv;
-	struct iovec iovrec[2];
-	char *data;
-	hdr header;
-	char payBuff[PAYLOAD_CHUNK_SIZE];
-	
-	    bzero(&msgrecv, sizeof(struct msghdr));
-	    bzero(&header, sizeof(hdr));
-	    bzero(&payBuff, PAYLOAD_CHUNK_SIZE + 1);
-	msgrecv.msg_name = NULL;
-	msgrecv.msg_namelen = 0;
-        msgrecv.msg_iov = iovrec;
-	msgrecv.msg_iovlen = 2;
-	iovrec[0].iov_len = sizeof(hdr);
-	iovrec[0].iov_base = (void *)&header;
-	iovrec[1].iov_len = PAYLOAD_CHUNK_SIZE;
-	iovrec[1].iov_base = payBuff;
-	
+	msg m;
+	printf("\nData Received on Client : ");
 	while (1)
 	{
-	    recvmsg(sockfd, &msgrecv, 0);
-	    //printf("\nData Recieved SEQ NO: %d\n", header.seq_num);
-	    //printf("\nData Recieved LEN: %d\n", msgrecv.msg_iov[1].iov_len);
-	    printf("%s", payBuff);
-	    if (header.msg_type == FIN)
+	    recv(sockfd, &m, sizeof(m), 0);
+	    printf("%s", m.payload);
+	    //printf("%s", payBuff);
+	    if (m.header.msg_type == FIN)
 		break;
 	}
 }
@@ -248,6 +231,6 @@ int main(int argc, char **argv)
 	/* Sending the 3-hand shake */
 	char msg[] = "ACK: 3-Handshake";
 	write(sockfd, msg, sizeof(msg));        
-	recvFile(sockfd);
+	recvFile(sockfd, servIP);
     
 }
