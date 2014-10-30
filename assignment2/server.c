@@ -8,28 +8,25 @@ struct existing_connections *existing_conn;
  * Function to check if client and server have same host network. 
  */
 
-int checkLocal (struct sockaddr_in serverIP, struct sockaddr_in serverIPnmsk, struct sockaddr_in serverIPsubnet, struct sockaddr_in clientIP)
-{
+int checkLocal (struct sockaddr_in serverIP, struct sockaddr_in serverIPnmsk, struct sockaddr_in serverIPsubnet, struct sockaddr_in clientIP)	{
         int isLocal;  
         char src[128];
 
         inet_ntop(AF_INET, &serverIP.sin_addr, src, sizeof(src));
-        if (strcmp(src, LOOPBACK) == 0)
-		return 1;
         
+	if (strcmp(src, LOOPBACK) == 0)
+		return 1;
 	else if ((serverIPnmsk.sin_addr.s_addr & clientIP.sin_addr.s_addr) == serverIPsubnet.sin_addr.s_addr)
 	    return 1;
 	
 	return 0;
-	
 }
 
 /* 
  * Write file contents over the connection socket.
  */
 
-void sendFile(int sockfd, char filename[496], struct sockaddr_in client_addr)
-{
+void sendFile(int sockfd, char filename[496], struct sockaddr_in client_addr)	{
          char buf[PAYLOAD_CHUNK_SIZE];
          int fp;
 	 int seqnum = 3, nbytes, advwin = 0, ts = 0, msgtype;
@@ -184,7 +181,18 @@ int childRequestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_in
         printf("\nReceived 3rd Hand Shake : %s", buf);
         
         sendFile(sockfd, filename, client_addr);
-	//return ntohs(addr.sin_port);
+}
+
+void addNewClienttoExistingConnections(struct sockaddr_in clientInfo, int pid, struct sockaddr_in headaddr)
+{   
+	struct existing_connections *new_conn;
+	new_conn = (struct existing_connections *)malloc(sizeof(struct existing_connections));
+	new_conn->client_addr.sin_addr.s_addr = clientInfo.sin_addr.s_addr;
+	new_conn->client_portNum = clientInfo.sin_port;
+	new_conn->child_pid = pid;
+	new_conn->serv_addr = headaddr;
+	new_conn->next_connection = existing_conn;
+	existing_conn = new_conn;
 }
 
 int existing_connection(struct sockaddr_in *client_addr){
@@ -198,9 +206,11 @@ int existing_connection(struct sockaddr_in *client_addr){
 	return 0;
 }
 
-/* Executed when server-child process dies */
-static void
-exitChild_handler (int signo)
+/* 
+ * Executed when server-child process dies 
+ */
+
+static void exitChild_handler (int signo)
 {
 	int l;
     	pid_t pid, del_pid = 0;
@@ -233,7 +243,6 @@ void listenInterfaces(struct servStruct *servInfo)
 	socklen_t len;
 	
 	msg packet_1HS;
-	struct msghdr recvmsg;
         char msg[512];
 	char src[128];
 	
@@ -279,22 +288,13 @@ void listenInterfaces(struct servStruct *servInfo)
 					printf("Duplicate connection request!");
 				}
 				else {
-					if ((pid = fork()) == 0)
-                                        {
-//                                                printf("\nClient Request Handler forked .");
+					if ((pid = fork()) == 0)    {
+//                                              printf("\nClient Request Handler forked .");
 						childRequestHandler(head->sockfd, interfaceList, clientInfo, packet_1HS.payload);
 						exit(0);
 					}
-					else
-					{
-						struct existing_connections *new_conn;
-						new_conn = (struct existing_connections *)malloc(sizeof(struct existing_connections));
-						new_conn->client_addr.sin_addr.s_addr = clientInfo.sin_addr.s_addr;
-						new_conn->client_portNum = clientInfo.sin_port;
-						new_conn->child_pid = pid;
-						new_conn->serv_addr = head->ifi_addr;
-						new_conn->next_connection = existing_conn;
-						existing_conn = new_conn;
+					else	{
+						addNewClienttoExistingConnections(clientInfo, pid, head->ifi_addr);
 //						printf("\nelse to be done");
 					}
 				}
