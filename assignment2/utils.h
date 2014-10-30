@@ -32,41 +32,10 @@ typedef struct message  {
 /* struct for Window Element	*/
 typedef struct Packet  {
 	int	seqnum;						/*  Sequence Number of Packet	    */
-	hdr	header;						/*  Packet Header		    */
+	msg	packet;						/*  DATA Packet 		    */
 	char	payload[PAYLOAD_CHUNK_SIZE];			/*  Data of the packet		    */
-	int	len;						/*  Length of the packet	    */
 	int	retranx;					/*  Retransmission Count	    */
 } packet;
-
-/* struct for Receiver Window Element	*/
-typedef struct RecvWinElem  {
-	packet	    pack;					/*  Data Packet			    */
-	int	    isValid;					/*  Check if Packet is present	    */
-} recvWinElem;
-
-/* struct for receiver Queue		*/
-typedef struct ReceiverQueue	{
-	recvWinElem	*elem;					/*  Receiver Buffer		    */
-	int		winsize;				/*  Queue Size			    */
-	int		adwinsize;				/*  Advertising Window Size	    */
-	int		adwinstart;				/*  Advertising Window Start	    */
-	int		readpacketidx;				/*  Oldest Packet to read to output */
-} recvQ;
-
-/* struct for Sender Window Element	*/
-typedef struct SenderWinElem  {
-	packet	    pack;					/*  Data Packet			    */
-	int	    isSent;					/*  Sent Flag of Data Packet	    */
-} sendWinElem;
-
-/* struct for receiver Queue		*/
-typedef struct SenderQueue	{
-	sendWinElem	*elem;					/*  Sender Buffer		    */
-	int		winsize;				/*  Queue Size			    */
-	int		slidwinsize;				/*  Sliding Window Size		    */
-	int		slidwinstart;				/*  Sliding Window Start	    */
-	int		sentstartidx;				/*  Oldest Packet sent to output    */
-} sendQ;
 
 
 /* struct for an Interface */
