@@ -164,7 +164,7 @@ void recvFile(int sockfd, struct sockaddr_in serverInfo)
 int main(int argc, char **argv)
 {	
 	struct clientStruct  *clientInfo        =       loadClientInfo();
-        int isLocal, sockfd;
+        int isLocal, sockfd, advwin = 0, ts = 0;
 	char src[128];
 	char recvBuff[1024];	
 	struct sockaddr_in servIP;	
@@ -193,28 +193,16 @@ int main(int argc, char **argv)
 	struct rtt_info rttinfo;
 	rtt_init(&rttinfo);
 	//rtt_newpack(&rttinfo);
-	char *payload = clientInfo->fileName;
-	struct msghdr sendmsg;
-	struct iovec iovecsend[2];
+	msg pack_1HS;
         hdr header;
 
-	header.msg_type = SYN_HS1;
-	header.seq_num = 1;
-	header.adv_window = clientInfo->rec_Window;
-	header.timestamp = htonl(rtt_ts(&rttinfo));
-        iovecsend[0].iov_base = (void *)&header;
-	iovecsend[0].iov_len = sizeof(hdr);
-	iovecsend[1].iov_base = (void *)payload;
-	iovecsend[1].iov_len = sizeof(payload);
+	createHeader(&header, SYN_HS1, 1, advwin, ts);
+        createMsgPacket(&pack_1HS, header, clientInfo->fileName, sizeof(clientInfo->fileName));
 	
-	sendmsg.msg_name = NULL;
-	sendmsg.msg_namelen = 0;
-	sendmsg.msg_iov = iovecsend;
-	sendmsg.msg_iovlen = 2;
 	
 //	sendmsg(sockfd, &sendmsg, sizeof(struct msghdr));
 	//write(sockfd, (void *)&sendmsg, sizeof(struct msghdr));
-	write(sockfd, clientInfo->fileName, sizeof(clientInfo->fileName));
+	write(sockfd, &pack_1HS, sizeof(pack_1HS));
 	
 	read(sockfd, recvBuff, sizeof(recvBuff));
 	printf("New port number recieved from Server : %d \n", ntohs(atoi(recvBuff)));

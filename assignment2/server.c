@@ -232,6 +232,7 @@ void listenInterfaces(struct servStruct *servInfo)
 	fd_set rset, allset;
 	socklen_t len;
 	
+	msg packet_1HS;
 	struct msghdr recvmsg;
         char msg[512];
 	char src[128];
@@ -268,11 +269,11 @@ void listenInterfaces(struct servStruct *servInfo)
 		while (head) {
 			if(FD_ISSET(head->sockfd, &rset)) {
 				len = sizeof(clientInfo);
-				recvfrom(head->sockfd, msg, sizeof(msg), 0, (struct sockaddr *)&clientInfo, &len);
+				recvfrom(head->sockfd, &packet_1HS, sizeof(packet_1HS), 0, (struct sockaddr *)&clientInfo, &len);
 				//recvfrom(head->sockfd, (void *)&recvmsg, sizeof(struct msghdr), 0, (struct sockaddr *)&clientInfo, &len);
 				inet_ntop(AF_INET, &clientInfo.sin_addr, src, sizeof(src));
 //				printf("\nClient Address  %s & port number %d ", src, clientInfo.sin_port);
-                                printf("\nFilename requested for transfer : %s \n", msg);
+                                printf("\nFilename requested for transfer : %s \n", packet_1HS.payload);
 				
 
                                 if( existing_connection(&clientInfo) == 1 ) { 
@@ -282,7 +283,7 @@ void listenInterfaces(struct servStruct *servInfo)
 					if ((pid = fork()) == 0)
                                         {
 //                                                printf("\nClient Request Handler forked .");
-						childRequestHandler(head->sockfd, interfaceList, clientInfo, msg);
+						childRequestHandler(head->sockfd, interfaceList, clientInfo, packet_1HS.payload);
 						exit(0);
 					}
 					else
