@@ -195,7 +195,7 @@ int main(int argc, char **argv)
 	//rtt_newpack(&rttinfo);
 	msg pack_1HS;
         hdr header;
-
+	advwin = clientInfo->rec_Window;
 	createHeader(&header, SYN_HS1, 1, advwin, ts);
         createMsgPacket(&pack_1HS, header, clientInfo->fileName, sizeof(clientInfo->fileName));
 	
@@ -205,8 +205,14 @@ int main(int argc, char **argv)
 	write(sockfd, &pack_1HS, sizeof(pack_1HS));
 	
 	read(sockfd, recvBuff, sizeof(recvBuff));
-	printf("New port number recieved from Server : %d \n", ntohs(atoi(recvBuff)));
-	clientInfo->serv_portNum = htons(atoi(recvBuff));
+	msg *pack_2HS = (msg *)recvBuff;
+	hdr header2 = pack_2HS->header;
+	char newPort[PAYLOAD_CHUNK_SIZE];
+	memcpy(newPort, pack_2HS->payload, PAYLOAD_CHUNK_SIZE);
+	if(header2.msg_type == ACK_HS2){
+	    printf(" 2 HS recvd : New port number recieved from Server : %d \n", ntohs(atoi(newPort)));
+	}
+	clientInfo->serv_portNum = htons(atoi(newPort));
 
 	/* Connect to the server on new port */
 	bzero(&servIP, sizeof(servIP));
@@ -217,8 +223,14 @@ int main(int argc, char **argv)
                 err_sys("\nconnect error\n");
 
 	/* Sending the 3-hand shake */
-	char msg[] = "ACK: 3-Handshake";
-	write(sockfd, msg, sizeof(msg));        
+
+	msg pack_3HS;
+	hdr header3;
+	createHeader(&header3, SYN_ACK_HS3, 3, advwin, ts);
+	createMsgPacket(&pack_3HS, header3, NULL, 0);
+	write(sockfd, &pack_3HS, sizeof(pack_3HS));    
+	//char msg[] = "ACK: 3-Handshake";
+	//write(sockfd, msg, sizeof(msg));        
 	recvFile(sockfd, servIP);
     
 }

@@ -116,7 +116,7 @@ int childRequestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_in
 	int sockfd, optval = -1, isLocal, newport;
 	socklen_t len;
 	struct sockaddr_in	servaddr, clientaddr, addr;
-	char src[128], buf[512];
+	char src[128], buf[PAYLOAD_CHUNK_SIZE];
 	
 	// Close other sockets except for the one 
 	while(head != NULL)
@@ -175,14 +175,24 @@ int childRequestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_in
 		head = head->ifi_next;
 	}
 
-	/* Send new connection socket to client */
+	/* Send new connection socket to client in 2 Handshake*/
+	msg pack_2HS;
+	hdr header2;
 	sprintf(buf, "%d", newport);
-	sendto(sock, buf, sizeof(buf), 0, (SA *)&client_addr, sizeof(client_addr));
-	read(sockfd, buf, sizeof(buf));
+        createHeader(&header2, ACK_HS2, 2, 0, 0);
+        createMsgPacket(&pack_2HS, header2, buf, sizeof(buf));
+	
+	sendto(sock, (void *)&pack_2HS, sizeof(pack_2HS), 0, (SA *)&client_addr, sizeof(client_addr));
+	
+	/* Recieving 3 Handshake */
+	read(sockfd, buf, sizeof(buf)); 
+	msg *pack_3HS = (msg *)buf;
+	hdr header3 = pack_3HS->header;
 	if (close(sock) == -1)
 		err_sys("close error");
-        printf("\nReceived 3rd Hand Shake : %s", buf);
-        
+	if(header3.msg_type == SYN_ACK_HS3){	
+		printf("\nReceived 3rd Hand Shake Successfully");
+        }
         sendFile(sockfd, filename, client_addr);
 	//return ntohs(addr.sin_port);
 }
@@ -272,8 +282,11 @@ void listenInterfaces(struct servStruct *servInfo)
 				recvfrom(head->sockfd, &packet_1HS, sizeof(packet_1HS), 0, (struct sockaddr *)&clientInfo, &len);
 				inet_ntop(AF_INET, &clientInfo.sin_addr, src, sizeof(src));
 //				printf("\nClient Address  %s & port number %d ", src, clientInfo.sin_port);
-                                printf("\nFilename requested for transfer : %s \n", packet_1HS.payload);
-				
+				hdr header1 = packet_1HS.header;
+				if(header1.msg_type == SYN_HS1){
+					printf("\n1 Handshake recieved from client \n");
+					printf("Filename requested for transfer by the client: %s \n", packet_1HS.payload);
+				}
 
                                 if( existing_connection(&clientInfo) == 1 ) { 
 					printf("Duplicate connection request!");
