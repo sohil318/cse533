@@ -270,7 +270,6 @@ void listenInterfaces(struct servStruct *servInfo)
 			if(FD_ISSET(head->sockfd, &rset)) {
 				len = sizeof(clientInfo);
 				recvfrom(head->sockfd, &packet_1HS, sizeof(packet_1HS), 0, (struct sockaddr *)&clientInfo, &len);
-				//recvfrom(head->sockfd, (void *)&recvmsg, sizeof(struct msghdr), 0, (struct sockaddr *)&clientInfo, &len);
 				inet_ntop(AF_INET, &clientInfo.sin_addr, src, sizeof(src));
 //				printf("\nClient Address  %s & port number %d ", src, clientInfo.sin_port);
                                 printf("\nFilename requested for transfer : %s \n", packet_1HS.payload);
