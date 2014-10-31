@@ -7,36 +7,32 @@
 #define SYN_HS1		    1
 #define ACK_HS2		    2
 #define SYN_ACK_HS3	    3
+
 #define WIN_UPDATE	    4
+
 #define DATA_PAYLOAD	    11
 #define DATA_ACK	    12
+
 #define FIN		    13
 #define FIN_ACK		    14
-#define PAYLOAD_CHUNK_SIZE  496
+
+#define PAYLOAD_CHUNK_SIZE  512
+#define PACKET_SIZE	    528
 
 /* struct for a Frame/Message Header */
 typedef struct header   {
-        int msg_type;		                             /* Determine type of message			       */
-        int seq_num;		                             /* sequence no/next expected seq no depending on msg_type */
-        int adv_window;                                      /* Advertising Window				       */
-        uint32_t timestamp;                                  /* Time Stamp					       */
+        int msg_type;		                        /* Determine type of message			       */
+        int seq_num;		                        /* sequence no/next expected seq no depending on msg_type */
+        int adv_window;                                 /* Advertising Window				       */
+        uint32_t timestamp;                             /* Time Stamp					       */
 }hdr;
 
 /* struct for message / frame */
 typedef struct message  {
-        hdr     header;						/* Structure to store header information    */
-        char    payload[PAYLOAD_CHUNK_SIZE];                    /* Actual Data bytes to be sent.	    */
-	int	len;						/* Size of payload			    */
+        hdr     header;					/* Structure to store header information    */
+        char    payload[PAYLOAD_CHUNK_SIZE];            /* Actual Data bytes to be sent.	    */
+	int	len;					/* Size of payload			    */
 }msg;
-
-/* struct for Window Element	*/
-typedef struct Packet  {
-	int	seqnum;						/*  Sequence Number of Packet	    */
-	msg	packet;						/*  DATA Packet 		    */
-	char	payload[PAYLOAD_CHUNK_SIZE];			/*  Data of the packet		    */
-	int	retranx;					/*  Retransmission Count	    */
-} packet;
-
 
 /* struct for an Interface */
 typedef struct InterfaceInfo {

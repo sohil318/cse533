@@ -1,10 +1,13 @@
 #include	 "utils.h"
+#include	 "server.h"
 #include         <setjmp.h>
+
 #define LOOPBACK "127.0.0.1"
 
 /*	Global	declarations	*/
 struct existing_connections *existing_conn;
 static sigjmp_buf jmpbuf;
+
 /* 
  * Function to check if client and server have same host network. 
  */
@@ -23,32 +26,115 @@ int checkLocal (struct sockaddr_in serverIP, struct sockaddr_in serverIPnmsk, st
     return 0;
 }
 
+/*
+ * SIGNAL ALARM Handler
+ */
+
+static void alarm_handler (int signo)
+{
+    //    printf("in child alarm handler for 2 hs\n");
+    siglongjmp(jmpbuf, 1);
+}
+
+/*
+ * Initialize Sender Queue 
+ */
+
+void initSenderQueue(sendQ *queue, int winsize)	{
+    queue->buffer		=   (sendWinElem *) calloc (winsize, sizeof(sendWinElem));
+    queue->winsize		=   winsize;
+    queue->cwinsize		=   5;				
+    queue->slidwinstart	=   0;				
+    queue->slidwinend	=   0;
+}
+
+/*
+ * Add to Sender Queue
+ */
+
+void addToSenderQueue(sendQ *queue, sendWinElem elem)	{
+    //printf("\nAdded To Sender Queue Seq Num : %d ", elem.seqnum);
+    queue->buffer[elem.seqnum % queue->winsize] = elem;	
+
+}
+
+/*
+ * Create a Sender Queue Element
+ */
+void createSenderElem (sendWinElem *elem, msg buf, int seqnum)	{
+    //printf("Creating Element at seq num = %d", seqnum);
+    elem->packet		=   buf;
+    elem->seqnum		=   seqnum;					
+    elem->retranx		=   0;					
+    elem->isPresent		=   1;					
+}
+
+/*
+ * Print the Sending Window
+ */
+
+void printSendingBuffer(sendQ *sendWin)	{
+    int i;
+    for (i = 0; i < sendWin->winsize ; i++)
+    {
+	if (sendWin->buffer[i].isPresent)
+	    printf("%5d", sendWin->buffer[i].seqnum);
+	else
+	    printf("   XX");
+    }	
+}
+
 /* 
  * Write file contents over the connection socket.
  */
 
-void sendFile(int sockfd, char filename[496], struct sockaddr_in client_addr)	{
+void sendFile(int sockfd, char filename[PAYLOAD_CHUNK_SIZE], struct sockaddr_in client_addr, sendQ *sendWin, int seqno, int adwin)	{
     char buf[PAYLOAD_CHUNK_SIZE];
-    int fp;
-    int seqnum = 3, nbytes, advwin = 0, ts = 0, msgtype;
+    int fp, i;
+    int seqnum = seqno, nbytes, advwin = adwin, ts = 0, msgtype;
     hdr header;
-    msg datapacket;
+    msg datapacket, ack;
+    sendWinElem sendelem;
 
     fp = open(filename, O_RDONLY, S_IREAD);
-    while ((nbytes = read(fp, buf, PAYLOAD_CHUNK_SIZE-1)) <= PAYLOAD_CHUNK_SIZE-1)
-    { 
-	buf[nbytes] = '\0';
-	//printf("\nBuf : %s", buf);
-	if (nbytes < PAYLOAD_CHUNK_SIZE - 1)
-	    msgtype        = FIN;
+
+    for ( i = 0; i < sendWin->cwinsize; i++)	{
+
+	if (seqnum <= sendWin->slidwinend)
+	{	
+	    /* Need to resend the packet */
+	    sendelem = sendWin->buffer[ seqnum % sendWin->winsize ];
+	    sendelem.retranx++;
+	    datapacket = sendelem.packet;
+	    sendWin->buffer[ seqnum % sendWin->winsize ] = sendelem;
+	}
 	else
-	    msgtype        = DATA_PAYLOAD;
+	{
+	    nbytes = read(fp, buf, PAYLOAD_CHUNK_SIZE-1);
+	    buf[nbytes] = '\0';
+	    //		printf("\nBuf : %s", buf);
+	    if (nbytes < PAYLOAD_CHUNK_SIZE - 1)
+		msgtype        = FIN;
+	    else
+		msgtype        = DATA_PAYLOAD;
 
-	createHeader(&header, msgtype, seqnum, advwin, ts);
-	createMsgPacket(&datapacket, header, buf, nbytes+1);
-
+	    createHeader(&header, msgtype, seqnum, advwin, ts);
+	    createMsgPacket(&datapacket, header, buf, nbytes+1);
+	    createSenderElem(&sendelem, datapacket, seqnum);
+	    addToSenderQueue(sendWin, sendelem);
+	    //printf("Sender Queue Elem seq Num : %d", sendWin->buffer[seqnum].packet.header.seq_num); 
+	    //printf("Sender Queue Elem data : %s", sendWin->buffer[seqnum].packet.payload); 
+	}
+	printf("Sending Seq # %d\n", datapacket.header.seq_num);
 	send(sockfd, &datapacket, sizeof(datapacket), 0);
+	recv(sockfd, &ack, sizeof(ack), 0);
+	printf("Ack # %d. Please Send Packet : %d", datapacket.header.seq_num, ack.header.seq_num);
+	printf("\tSender Window State : ");
+	printSendingBuffer(sendWin);
+	printf("\n");
+
 	seqnum++;
+
 	if (msgtype == FIN)
 	    break;
 	bzero(&buf, PAYLOAD_CHUNK_SIZE);
@@ -56,14 +142,10 @@ void sendFile(int sockfd, char filename[496], struct sockaddr_in client_addr)	{
     }
 }
 
-static void 
-alarm_handler (int signo)
-{
-//    printf("in child alarm handler for 2 hs\n");
-    siglongjmp(jmpbuf, 1);
-}
+/* 
+ * Setup connection with using new port 
+ */
 
-/* Setup connection with using new port */
 int createConn(int isLocal, struct sockaddr_in client_addr, struct sockaddr_in *clientaddr, struct sockaddr_in *servaddr, struct sockaddr_in *addr, struct InterfaceInfo *head)
 {
     int sockfd, optval = -1;
@@ -113,8 +195,12 @@ int createConn(int isLocal, struct sockaddr_in client_addr, struct sockaddr_in *
     return sockfd;
 }
 
-/* Forked server child for service requesting client */ 
-int childRequestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_in client_addr, char filename[496])
+
+/* 
+ * Forked server child for service requesting client  
+ */ 
+
+int childRequestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_in client_addr, char filename[PAYLOAD_CHUNK_SIZE], sendQ* sendWin)
 {
     //printf ("Handling forked Child");
     int sockfd, optval = -1, isLocal, newport;
@@ -187,7 +273,7 @@ int childRequestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_in
     createMsgPacket(&pack_2HS, header2, buf, sizeof(buf));
     int retransmit_attempt = 0;
 
-send_HS2_again:
+resend_HS2:
     sendto(sock, (void *)&pack_2HS, sizeof(pack_2HS), 0, (SA *)&client_addr, sizeof(client_addr));
     retransmit_attempt++;
 
@@ -202,7 +288,7 @@ send_HS2_again:
 	    exit(0);
 	}
 	printf("Request timed out. Retransmitting 2HS from both the ports now ...: attempt number: %d\n", retransmit_attempt);
-	goto send_HS2_again;
+	goto resend_HS2;
     }                                                                                                                                                                                                   
     alarm(3);
 
@@ -225,11 +311,18 @@ send_HS2_again:
     if(header3.msg_type == SYN_ACK_HS3){	
 	printf("\nReceived 3rd Hand Shake Successfully");
     }
-    sendFile(sockfd, filename, client_addr);
+
+    printf("\n Start file transfer Seq number = %d, Initial Advertising window = %d\n", header3.seq_num, header3.adv_window);
+    sendFile(sockfd, filename, client_addr, sendWin, header3.seq_num, header3.adv_window);
+
 }
 
-void addNewClienttoExistingConnections(struct sockaddr_in clientInfo, int pid, struct sockaddr_in headaddr)
-{   
+/*
+ *	Add Client Connect Request to the List of Existing Connections
+ */
+
+void addNewClienttoExistingConnections(struct sockaddr_in clientInfo, int pid, struct sockaddr_in headaddr)	{   
+
     struct existing_connections *new_conn;
     new_conn = (struct existing_connections *)malloc(sizeof(struct existing_connections));
     new_conn->client_addr.sin_addr.s_addr = clientInfo.sin_addr.s_addr;
@@ -238,12 +331,17 @@ void addNewClienttoExistingConnections(struct sockaddr_in clientInfo, int pid, s
     new_conn->serv_addr = headaddr;
     new_conn->next_connection = existing_conn;
     existing_conn = new_conn;
+
 }
+
+/*
+ *	Check if Client Connection Request is in the List of Existing Connections
+ */
 
 int existing_connection(struct sockaddr_in *client_addr){
     struct existing_connections *conn_list = existing_conn;
     while(conn_list!=NULL){
-	if(((conn_list->client_portNum == client_addr->sin_port) && (conn_list->client_addr.sin_addr.s_addr == client_addr->sin_addr.s_addr))){
+	if(((conn_list->client_portNum == client_addr->sin_port) && (conn_list->client_addr.sin_addr.s_addr == client_addr->sin_addr.s_addr)))	{
 	    return 1;
 	}	
 	conn_list = conn_list->next_connection;
@@ -282,16 +380,17 @@ static void exitChild_handler (int signo)
     }	
 }	
 
-void listenInterfaces(struct servStruct *servInfo)
+void listenInterfaces(struct servStruct *servInfo, sendQ *sendWin)
 {
     fd_set rset, allset;
     socklen_t len;
 
     msg packet_1HS;
-    char msg[512];
+    char msg[PAYLOAD_CHUNK_SIZE];
     char src[128];
 
-    int 	maxfdpl = -1, nready, pid;
+    int maxfdpl = -1, nready, pid;
+    sigset_t signal_set;
 
     struct sockaddr_in clientInfo;
     struct InterfaceInfo *head  = servInfo->ifi_head;
@@ -327,23 +426,21 @@ void listenInterfaces(struct servStruct *servInfo)
 		inet_ntop(AF_INET, &clientInfo.sin_addr, src, sizeof(src));
 		//				printf("\nClient Address  %s & port number %d ", src, clientInfo.sin_port);
 		hdr header1 = packet_1HS.header;
-		if(header1.msg_type == SYN_HS1){
+		if(header1.msg_type == SYN_HS1)	{
 		    printf("\n1 Handshake recieved from client \n");
 		    printf("Filename requested for transfer by the client: %s \n", packet_1HS.payload);
 		}
-
 		if( existing_connection(&clientInfo) == 1 ) { 
 		    printf("Duplicate connection request!");
 		}
 		else {
 		    if ((pid = fork()) == 0)    {
 			//                                              printf("\nClient Request Handler forked .");
-			childRequestHandler(head->sockfd, interfaceList, clientInfo, packet_1HS.payload);
+			childRequestHandler(head->sockfd, interfaceList, clientInfo, packet_1HS.payload, sendWin);
 			exit(0);
 		    }
 		    else
 		    {
-			sigset_t signal_set;
 			sigemptyset(&signal_set);
 			sigaddset(&signal_set, SIGCHLD);
 			sigprocmask(SIG_BLOCK, &signal_set, NULL);
@@ -360,11 +457,14 @@ void listenInterfaces(struct servStruct *servInfo)
 
 int main(int argc, char **argv)
 {	
+
     Signal(SIGCHLD, exitChild_handler);
     Signal(SIGALRM, alarm_handler);
+
+    sendQ sendWin;
+    struct servStruct *servInfo = loadServerInfo();
     existing_connections *existing_conn = NULL;
 
-    struct servStruct *servInfo = loadServerInfo();
-
-    listenInterfaces (servInfo);
+    initSenderQueue(&sendWin, servInfo->send_Window);
+    listenInterfaces (servInfo, &sendWin);
 }
