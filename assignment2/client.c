@@ -1,11 +1,15 @@
 #include	 "utils.h"
 #include	 "unprtt.h"
 #include	 "client.h"
+#include	 <setjmp.h>
+
 #define LOOPBACK "127.0.0.1"
 
 /*
  * Function to get subnet mask bits
  */
+
+static sigjmp_buf jmpbuf;
 
 int getSubnetCount(unsigned long netmsk)
 {
@@ -17,6 +21,16 @@ int getSubnetCount(unsigned long netmsk)
     }
     return count;
 }
+
+/* 
+ * Signal Handler for SIGALARM
+ */
+
+static void alarm_handler (int signo)
+{
+    siglongjmp(jmpbuf, 1);
+}
+
 
 /* 
  * Function to check if client and server have same host network. 
@@ -194,7 +208,6 @@ void addtoReceiverQueue (recvWinElem *buf, msg packet)	{
  */
 
 
-
 int main(int argc, char **argv)
 {	
 	struct clientStruct  *clientInfo        =       loadClientInfo();
@@ -202,8 +215,11 @@ int main(int argc, char **argv)
 	char src[128];
 	char recvBuff[1024];	
 	struct sockaddr_in servIP;	
+	int retrans_times = 0;
 
-        if (clientInfo)
+	Signal(SIGALRM, alarm_handler);
+        
+	if (clientInfo)
                 isLocal = checkLocal(&clientInfo);
         
 	if (isLocal)
@@ -216,12 +232,6 @@ int main(int argc, char **argv)
 
 	memset(recvBuff, '0',sizeof(recvBuff));
 
-/*
-	inet_ntop(AF_INET, &clientInfo->serv_addr.sin_addr, src, sizeof(src));
-        printf("\nServer IP Address : %s",	src);
-	inet_ntop(AF_INET, &clientInfo->cli_addr.sin_addr, src, sizeof(src));
-        printf("\nClient Address : %s",	src);
-*/
 	sockfd = createInitialConn(&clientInfo, isLocal);  
 
 	struct rtt_info rttinfo;
@@ -229,18 +239,42 @@ int main(int argc, char **argv)
 	//rtt_newpack(&rttinfo);
 	msg pack_1HS;
         hdr header;
-
+	advwin = clientInfo->rec_Window;
 	createHeader(&header, SYN_HS1, 1, advwin, ts);
         createMsgPacket(&pack_1HS, header, clientInfo->fileName, sizeof(clientInfo->fileName));
 	
-	
-//	sendmsg(sockfd, &sendmsg, sizeof(struct msghdr));
-	//write(sockfd, (void *)&sendmsg, sizeof(struct msghdr));
+send_1HS_again:
+
 	write(sockfd, &pack_1HS, sizeof(pack_1HS));
+	retrans_times++;
+
+    if (sigsetjmp(jmpbuf, 1) != 0) {
+            if (retrans_times > 12) {
+	                printf("No response from the server for 1HS after max retransmission attempts. Giving up.\n");
+			exit(0);
+	   }
+	   printf("Request timed out. Retransmitting 1HS ...");
+	   goto send_1HS_again;
+    }
+
+	alarm(3);
+
+	hdr header2;
+	char newPort[PAYLOAD_CHUNK_SIZE]; 
 	
-	read(sockfd, recvBuff, sizeof(recvBuff));
-	printf("New port number recieved from Server : %d \n", ntohs(atoi(recvBuff)));
-	clientInfo->serv_portNum = htons(atoi(recvBuff));
+	do{	
+	    read(sockfd, recvBuff, sizeof(recvBuff));
+	    msg *pack_2HS = (msg *)recvBuff;
+	    header2 = pack_2HS->header;
+	    memcpy(newPort, pack_2HS->payload, PAYLOAD_CHUNK_SIZE);
+	}while(header2.msg_type != ACK_HS2);
+
+	alarm(0);
+
+	if(header2.msg_type == ACK_HS2){
+	    printf(" 2 HS recvd : New port number recieved from Server : %d \n", ntohs(atoi(newPort)));
+	}
+	clientInfo->serv_portNum = htons(atoi(newPort));
 
 	/* Connect to the server on new port */
 	bzero(&servIP, sizeof(servIP));
@@ -251,8 +285,15 @@ int main(int argc, char **argv)
                 err_sys("\nconnect error\n");
 
 	/* Sending the 3-hand shake */
-	char msg[] = "ACK: 3-Handshake";
-	write(sockfd, msg, sizeof(msg));        
+	sleep(7);
+	msg pack_3HS;
+	hdr header3;
+	createHeader(&header3, SYN_ACK_HS3, 3, advwin, ts);
+	createMsgPacket(&pack_3HS, header3, NULL, 0);
+	write(sockfd, &pack_3HS, sizeof(pack_3HS));    
+	printf("Sent third handshake, waiting for data from server  now \n");
 	recvFile(sockfd, servIP);
     
 }
+
+

@@ -21,22 +21,25 @@ CFLAGS = ${FLAGS} -I${HOME}/lib -I${ASSGN2}/
 
 all: server client
 
-server: server.o utils.o get_ifi_info_plus.o
-	${CC} -o server server.o get_ifi_info_plus.o utils.o ${LIBS}
+server: server.o utils.o get_ifi_info_plus.o rtt.o
+	${CC} -o server server.o get_ifi_info_plus.o utils.o rtt.o ${LIBS}
 server.o: server.c
 	${CC} ${CFLAGS} -c server.c
 
-client: client.o utils.o get_ifi_info_plus.o
-	${CC} -o client client.o get_ifi_info_plus.o utils.o ${LIBS}
+client: client.o utils.o get_ifi_info_plus.o rtt.o
+	${CC} -o client client.o get_ifi_info_plus.o utils.o rtt.o ${LIBS}
 client.o: client.c
 	${CC} ${CFLAGS} -c client.c
 
 utils.o: utils.c 
 	${CC} ${CFLAGS} -c utils.c
 
+rtt.o: rtt.c 
+	${CC} ${CFLAGS} -c rtt.c
+
 get_ifi_info_plus.o: ${ASSGN2}/get_ifi_info_plus.c
 	${CC} ${CFLAGS} -c ${ASSGN2}/get_ifi_info_plus.c
 
 clean:
-	rm client server server.o get_ifi_info_plus.o utils.o client.o
+	rm client server server.o get_ifi_info_plus.o utils.o client.o rtt.o
 
