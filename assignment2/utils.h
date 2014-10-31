@@ -82,6 +82,7 @@ clientStruct * loadClientInfo();
 
 void createHeader(hdr *header, int msg_type, int seqnum, int advwin, int ts);
 void createMsgPacket(msg *datapack, hdr header, char *buf, int len);
+void createAckPacket(msg *ackpack, int msgtype, int ackno, int advwin, int ts);
 
 #endif	/* __utils_h */
 

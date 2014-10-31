@@ -44,8 +44,8 @@ void initSenderQueue(sendQ *queue, int winsize)	{
     queue->buffer		=   (sendWinElem *) calloc (winsize, sizeof(sendWinElem));
     queue->winsize		=   winsize;
     queue->cwinsize		=   5;				
-    queue->slidwinstart	=   0;				
-    queue->slidwinend	=   0;
+    queue->slidwinstart		=   0;				
+    queue->slidwinend		=   0;
 }
 
 /*
