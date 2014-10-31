@@ -7,16 +7,18 @@
 
 /* struct for Receiver Window Element	*/
 typedef struct RecvWinElem  {
-	packet	    pack;					/*  Data Packet			    */
+	msg	    packet;					/*  DATA Packet 		    */
+	int	    seqnum;					/*  Sequence Number of Packet	    */
+	int	    retranx;					/*  Retransmission Count	    */
 	int	    isValid;					/*  Check if Packet is present	    */
 } recvWinElem;
 
 /* struct for receiver Queue		*/
 typedef struct ReceiverQueue	{
-	recvWinElem	*elem;					/*  Receiver Buffer		    */
+	recvWinElem	*buffer;				/*  Receiver Buffer		    */
 	int		winsize;				/*  Queue Size			    */
-	int		adwinsize;				/*  Advertising Window Size	    */
-	int		adwinstart;				/*  Advertising Window Start	    */
+	int		advwinsize;				/*  Advertising Window Size	    */
+	int		advwinstart;				/*  Advertising Window Start	    */
 	int		readpacketidx;				/*  Oldest Packet to read to output */
 } recvQ;
 

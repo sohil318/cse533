@@ -7,17 +7,19 @@
 
 /* struct for Sender Window Element	*/
 typedef struct SenderWinElem  {
-	packet	    pack;					/*  Data Packet			    */
-	int	    isSent;					/*  Sent Flag of Data Packet	    */
+	msg	    packet;					/*  DATA Packet 		    */
+	int	    seqnum;					/*  Sequence Number of Packet	    */
+	int	    retranx;					/*  Retransmission Count	    */
+	int	    isPresent;					/*  Sent Flag of Data Packet	    */
 } sendWinElem;
 
 /* struct for receiver Queue		*/
 typedef struct SenderQueue	{
-	sendWinElem	*elem;					/*  Sender Buffer		    */
+	sendWinElem	*buffer;				/*  Sender Buffer		    */
 	int		winsize;				/*  Queue Size			    */
-	int		slidwinsize;				/*  Sliding Window Size		    */
+	int		cwinsize;				/*  Sliding Window Size		    */
 	int		slidwinstart;				/*  Sliding Window Start	    */
-	int		sentstartidx;				/*  Oldest Packet sent to output    */
+	int		slidwinend;				/*  Oldest Packet sent to output    */
 } sendQ;
 
 #endif	/* __server_h */

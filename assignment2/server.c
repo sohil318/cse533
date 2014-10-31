@@ -1,4 +1,5 @@
 #include	 "utils.h"
+#include	 "server.h"
 #define LOOPBACK "127.0.0.1"
 
 /*	Global	declarations	*/
@@ -22,32 +23,83 @@ int checkLocal (struct sockaddr_in serverIP, struct sockaddr_in serverIPnmsk, st
 	return 0;
 }
 
+/*
+ * Initialize Sender Queue 
+ */
+
+void initSenderQueue(sendQ *queue, int winsize)	{
+	queue->buffer		=   (sendWinElem *) calloc (winsize, sizeof(sendWinElem));
+	queue->winsize		=   winsize;
+	queue->cwinsize		=   5;				
+	queue->slidwinstart	=   0;				
+	queue->slidwinend	=   0;
+}
+
+/*
+ * Add to Sender Queue
+ */
+
+void addToSenderQueue(sendQ *queue, sendWinElem elem)	{
+	//printf("\nAdded To Sender Queue Seq Num : %d ", elem.seqnum);
+	queue->buffer[elem.seqnum % queue->winsize] = elem;	
+
+}
+
+/*
+ * Create a Sender Queue Element
+ */
+void createSenderElem (sendWinElem *elem, msg buf, int seqnum)	{
+	//printf("Creating Element at seq num = %d", seqnum);
+	elem->packet		=   buf;
+	elem->seqnum		=   seqnum;					
+	elem->retranx		=   0;					
+	elem->isPresent		=   1;					
+}
+
 /* 
  * Write file contents over the connection socket.
  */
 
-void sendFile(int sockfd, char filename[496], struct sockaddr_in client_addr)	{
+void sendFile(int sockfd, char filename[PAYLOAD_CHUNK_SIZE], struct sockaddr_in client_addr, sendQ *sendWin, int seqno, int adwin)	{
          char buf[PAYLOAD_CHUNK_SIZE];
-         int fp;
-	 int seqnum = 3, nbytes, advwin = 0, ts = 0, msgtype;
+         int fp, i;
+	 int seqnum = seqno, nbytes, advwin = adwin, ts = 0, msgtype;
 	 hdr header;
 	 msg datapacket;
+	 sendWinElem sendelem;
 	
          fp = open(filename, O_RDONLY, S_IREAD);
-         while ((nbytes = read(fp, buf, PAYLOAD_CHUNK_SIZE-1)) <= PAYLOAD_CHUNK_SIZE-1)
-	 { 
-	    buf[nbytes] = '\0';
-	    //printf("\nBuf : %s", buf);
-	    if (nbytes < PAYLOAD_CHUNK_SIZE - 1)
-		msgtype        = FIN;
+
+	 for ( i = 0; i < sendWin->cwinsize; i++)	{
+         
+	    if (seqnum <= sendWin->slidwinend)
+	    {	
+		/* Need to resend the packet */
+		sendelem = sendWin->buffer[ seqnum % sendWin->winsize ];
+		sendelem.retranx++;
+		datapacket = sendelem.packet;
+		sendWin->buffer[ seqnum % sendWin->winsize ] = sendelem;
+	    }
 	    else
-		msgtype        = DATA_PAYLOAD;
+	    {
+		nbytes = read(fp, buf, PAYLOAD_CHUNK_SIZE-1);
+		buf[nbytes] = '\0';
+//		printf("\nBuf : %s", buf);
+		if (nbytes < PAYLOAD_CHUNK_SIZE - 1)
+		    msgtype        = FIN;
+		else
+		    msgtype        = DATA_PAYLOAD;
 	    
-	    createHeader(&header, msgtype, seqnum, advwin, ts);
-	    createMsgPacket(&datapacket, header, buf, nbytes+1);
-	    
+		createHeader(&header, msgtype, seqnum, advwin, ts);
+		createMsgPacket(&datapacket, header, buf, nbytes+1);
+		createSenderElem(&sendelem, datapacket, seqnum);
+		addToSenderQueue(sendWin, sendelem);
+		//printf("Sender Queue Elem seq Num : %d", sendWin->buffer[seqnum].packet.header.seq_num); 
+		//printf("Sender Queue Elem data : %s", sendWin->buffer[seqnum].packet.payload); 
+	    }
 	    send(sockfd, &datapacket, sizeof(datapacket), 0);
 	    seqnum++;
+
 	    if (msgtype == FIN)
 		break;
 	    bzero(&buf, PAYLOAD_CHUNK_SIZE);
@@ -55,65 +107,17 @@ void sendFile(int sockfd, char filename[496], struct sockaddr_in client_addr)	{
          }
 }
 
+/* 
+ * Forked server child for service requesting client  
+ */ 
 
-/* Setup connection with using new port */
-int createConn(int isLocal, struct sockaddr_in client_addr, struct sockaddr_in *clientaddr, struct sockaddr_in *servaddr, struct sockaddr_in *addr, struct InterfaceInfo *head)
-{
-	int sockfd, optval = -1;
-	socklen_t len;
-	char src[128];
-        
-        if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
-                err_sys("\nsocket creation error\n");
-
-	printf("socket completed");
-        if(isLocal)
-                if (setsockopt(sockfd, SOL_SOCKET, SO_DONTROUTE, &optval, sizeof(optval)) < 0)
-                {
-                        printf("\nerror : socket option error.\n");
-                        close(sockfd);
-                        exit(2);
-                }
-	printf("socket completed");
-
-        /* binding to the serv ip */
-        bzero(&servaddr, sizeof(servaddr));
-        servaddr->sin_family     	 = AF_INET;
-        servaddr->sin_addr.s_addr 	 = htonl(head->ifi_addr.sin_addr.s_addr);				
-        servaddr->sin_port        	 = htons(0);
-        if(bind(sockfd, (SA *) servaddr, sizeof(servaddr))) 
-        {
-                close(sockfd);
-                err_sys("error in bind\n");
-        }
-	printf("bind completed");
-        /* determining the port number */
-        len = sizeof(struct sockaddr);
-        bzero(&addr, sizeof(struct sockaddr_in));  
-        getsockname(sockfd, (struct sockaddr *)addr, &len);
-        inet_ntop(AF_INET, &addr->sin_addr, src, sizeof(src)); 
-        printf("\nClient is connected to Server at IP Address = %s \t Port No : %d\n ", src, ntohs(addr->sin_port)); 
-
-        /* connect to client ip */
-        bzero(&clientaddr, sizeof(clientaddr));
-        clientaddr->sin_family              = AF_INET;
-        clientaddr->sin_addr.s_addr         = htonl(client_addr.sin_addr.s_addr);
-        clientaddr->sin_port                = addr->sin_port;
-        if(connect(sockfd, (struct sockaddr *)&client_addr, sizeof(struct sockaddr))!=0) 
-        {
-                printf("init_connection_socket: failed to connect to client\n");
-        }
-        return sockfd;
-}
-
-/* Forked server child for service requesting client */ 
-int childRequestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_in client_addr, char filename[496])
+int childRequestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_in client_addr, char filename[PAYLOAD_CHUNK_SIZE], sendQ* sendWin)
 {
 	//printf ("Handling forked Child");
 	int sockfd, optval = -1, isLocal, newport;
 	socklen_t len;
 	struct sockaddr_in	servaddr, clientaddr, addr;
-	char src[128], buf[512];
+	char src[128], buf[PACKET_SIZE];
 	
 	// Close other sockets except for the one 
 	while(head != NULL)
@@ -180,11 +184,15 @@ int childRequestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_in
 		err_sys("close error");
         printf("\nReceived 3rd Hand Shake : %s", buf);
         
-        sendFile(sockfd, filename, client_addr);
+        sendFile(sockfd, filename, client_addr, sendWin, 3, 10);
+
 }
 
-void addNewClienttoExistingConnections(struct sockaddr_in clientInfo, int pid, struct sockaddr_in headaddr)
-{   
+/*
+ *	Add Client Connect Request to the List of Existing Connections
+ */
+
+void addNewClienttoExistingConnections(struct sockaddr_in clientInfo, int pid, struct sockaddr_in headaddr)	{   
 	struct existing_connections *new_conn;
 	new_conn = (struct existing_connections *)malloc(sizeof(struct existing_connections));
 	new_conn->client_addr.sin_addr.s_addr = clientInfo.sin_addr.s_addr;
@@ -195,7 +203,11 @@ void addNewClienttoExistingConnections(struct sockaddr_in clientInfo, int pid, s
 	existing_conn = new_conn;
 }
 
-int existing_connection(struct sockaddr_in *client_addr){
+/*
+ *	Check if Client Connection Request is in the List of Existing Connections
+ */
+
+int existing_connection(struct sockaddr_in *client_addr)    {
 	struct existing_connections *conn_list = existing_conn;
 	while(conn_list!=NULL){
 		if(((conn_list->client_portNum == client_addr->sin_port) && (conn_list->client_addr.sin_addr.s_addr == client_addr->sin_addr.s_addr))){
@@ -237,7 +249,7 @@ static void exitChild_handler (int signo)
 	}	
 }	
 
-void listenInterfaces(struct servStruct *servInfo)
+void listenInterfaces(struct servStruct *servInfo, sendQ *sendWin)
 {
 	fd_set rset, allset;
 	socklen_t len;
@@ -282,7 +294,6 @@ void listenInterfaces(struct servStruct *servInfo)
 				inet_ntop(AF_INET, &clientInfo.sin_addr, src, sizeof(src));
 //				printf("\nClient Address  %s & port number %d ", src, clientInfo.sin_port);
                                 printf("\nFilename requested for transfer : %s \n", packet_1HS.payload);
-				
 
                                 if( existing_connection(&clientInfo) == 1 ) { 
 					printf("Duplicate connection request!");
@@ -290,7 +301,7 @@ void listenInterfaces(struct servStruct *servInfo)
 				else {
 					if ((pid = fork()) == 0)    {
 //                                              printf("\nClient Request Handler forked .");
-						childRequestHandler(head->sockfd, interfaceList, clientInfo, packet_1HS.payload);
+						childRequestHandler(head->sockfd, interfaceList, clientInfo, packet_1HS.payload, sendWin);
 						exit(0);
 					}
 					else	{
@@ -306,10 +317,11 @@ void listenInterfaces(struct servStruct *servInfo)
 
 int main(int argc, char **argv)
 {	
+	sendQ sendWin;
 	existing_connections *existing_conn = NULL;
-	
 	struct servStruct *servInfo = loadServerInfo();
-
-        listenInterfaces (servInfo);
+	initSenderQueue(&sendWin, servInfo->send_Window);
+	
+        listenInterfaces (servInfo, &sendWin);
 	signal(SIGCHLD, exitChild_handler);
 }

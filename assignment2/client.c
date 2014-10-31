@@ -1,5 +1,6 @@
 #include	 "utils.h"
 #include	 "unprtt.h"
+#include	 "client.h"
 #define LOOPBACK "127.0.0.1"
 
 /*
@@ -150,16 +151,49 @@ int createInitialConn(struct clientStruct **cliInfo, int isLocal)
 void recvFile(int sockfd, struct sockaddr_in serverInfo)
 {
 	msg m;
+	int msgtype;
 	printf("\nData Received on Client : ");
 	while (1)
 	{
+	    //printf("Printinf Seq Num\n");
 	    recv(sockfd, &m, sizeof(m), 0);
+	    //printf("Printinf Seq Num %d", m.header.seq_num);
+	    //printf("Printinf Payload %s", m.payload);
 	    printf("%s", m.payload);
-	    //printf("%s", payBuff);
 	    if (m.header.msg_type == FIN)
 		break;
+		//msgtype = FIN_ACK;
+	    //else
+		//msgtype = ACK;
+
 	}
 }
+
+/*
+ * Initialize Receiver Queue 
+ */
+
+void initRecvQueue(recvQ *queue, int winsize, int advwin)	{
+	queue->buffer		=   (recvWinElem *) calloc (winsize, sizeof(recvWinElem));
+	queue->winsize		=   winsize;
+	queue->advwinsize	=   advwin;				
+	queue->advwinstart	=   0;				
+	queue->readpacketidx	=   0;
+}
+
+/*
+ * Add to Receiver Queue
+ */
+
+void addtoReceiverQueue (recvWinElem *buf, msg packet)	{
+		
+}
+
+/*
+ * Create Packet Queue
+ */
+
+
 
 int main(int argc, char **argv)
 {	
@@ -191,7 +225,7 @@ int main(int argc, char **argv)
 	sockfd = createInitialConn(&clientInfo, isLocal);  
 
 	struct rtt_info rttinfo;
-	rtt_init(&rttinfo);
+	//rtt_init(&rttinfo);
 	//rtt_newpack(&rttinfo);
 	msg pack_1HS;
         hdr header;
