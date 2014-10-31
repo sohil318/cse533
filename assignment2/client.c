@@ -253,7 +253,7 @@ send_1HS_again:
 	createHeader(&header3, SYN_ACK_HS3, 3, advwin, ts);
 	createMsgPacket(&pack_3HS, header3, NULL, 0);
 	write(sockfd, &pack_3HS, sizeof(pack_3HS));    
-	printf("Sent third handshake, waiting for data from server  now \n");
+	printf("Sent third handshake, waiting for data from server\n");
 	recvFile(sockfd, servIP);
     
 }
