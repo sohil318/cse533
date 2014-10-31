@@ -158,22 +158,106 @@ int createInitialConn(struct clientStruct **cliInfo, int isLocal)
 
 }
 
+/*
+ * Initialize Receiver Queue 
+ */
+
+void initRecvQueue(recvQ *queue, int winsize, int advwinstart)	{
+    queue->buffer		=   (recvWinElem *) calloc (winsize, sizeof(recvWinElem));
+    queue->winsize		=   winsize;
+    queue->advwinsize		=   winsize;				
+    queue->advwinstart		=   advwinstart;				
+    queue->readpacketidx    	=   -1;
+}
+
+/*
+ * Create a Receiver Queue Element
+ */
+
+void createRecvElem (recvWinElem *elem, msg datapacket, int seqnum)	{
+    //printf("Creating Element at seq num = %d", seqnum);
+    elem->packet		=   datapacket;
+    elem->seqnum		=   seqnum;					
+    elem->retranx		=   0;					
+    elem->isValid   		=   1;					
+}
+
+/*
+ * Add to Receiver Queue
+ */
+
+int addToReceiverQueue(recvQ *queue, recvWinElem elem)	{
+    //printf("\nAdded To Receiver Queue Seq Num : %d ", elem.seqnum);
+    int idx = elem.seqnum % queue->winsize;
+    if (queue->buffer[idx].isValid == 0)
+    {
+	if (queue->readpacketidx == -1)
+	    queue->readpacketidx = idx;
+    
+	queue->buffer[idx]	    =	elem;
+	queue->buffer[idx].isValid  =	1;
+	if (queue->advwinstart == elem.seqnum)
+	{
+	    queue->advwinsize--;
+	    while (queue->buffer[ ++queue->advwinstart % queue->winsize ].isValid)
+	    {
+		queue->advwinsize--;
+	    }
+	}
+    }
+    else
+	return 0;
+
+    return 1;
+}
+
+/*
+ * Print the Receiving Window
+ */
+
+void printReceivingBuffer(recvQ *recvWin)	{
+    int i;
+    for (i = 0; i < recvWin->winsize ; i++)
+    {
+	if (recvWin->buffer[i].isValid)
+	    printf("%5d", recvWin->buffer[i].seqnum);
+	else
+	    printf("   XX");
+    }	
+}
+
 /* 
  * Read file contents over the network sent by the Reliable UDP Server.
  */
 
-void recvFile(int sockfd, struct sockaddr_in serverInfo)
+void recvFile(int sockfd, recvQ *queue, struct sockaddr_in serverInfo, int awin)
 {
-	msg m;
-	int msgtype;
-	printf("\nData Received on Client : ");
+	msg m, ack;
+	recvWinElem elem;
+	int msgtype, advwin = awin, ts = 0, status;
+	printf("\nData Received on Client : \n");
 	while (1)
 	{
 	    //printf("Printinf Seq Num\n");
 	    recv(sockfd, &m, sizeof(m), 0);
+	    createRecvElem (&elem, m, m.header.seq_num);
+	    status = addToReceiverQueue(queue, elem);
+
 	    //printf("Printinf Seq Num %d", m.header.seq_num);
 	    //printf("Printinf Payload %s", m.payload);
-	    printf("%s", m.payload);
+	    //printf("%s", m.payload);
+	    printf("Received Packet : %d", m.header.seq_num);
+	    printf("\tReceived Queue State \t"); 
+	    printReceivingBuffer(queue);
+	    printf("\n");
+	    if (m.header.msg_type == FIN)
+		msgtype = FIN_ACK;
+	    else
+		msgtype = DATA_ACK;
+	    
+	    createAckPacket(&ack, msgtype, queue->advwinstart, queue->advwinsize, ts);
+	    send(sockfd, &ack, sizeof(ack), 0);
+	    
 	    if (m.header.msg_type == FIN)
 		break;
 		//msgtype = FIN_ACK;
@@ -182,31 +266,6 @@ void recvFile(int sockfd, struct sockaddr_in serverInfo)
 
 	}
 }
-
-/*
- * Initialize Receiver Queue 
- */
-
-void initRecvQueue(recvQ *queue, int winsize, int advwin)	{
-	queue->buffer		=   (recvWinElem *) calloc (winsize, sizeof(recvWinElem));
-	queue->winsize		=   winsize;
-	queue->advwinsize	=   advwin;				
-	queue->advwinstart	=   0;				
-	queue->readpacketidx	=   0;
-}
-
-/*
- * Add to Receiver Queue
- */
-
-void addtoReceiverQueue (recvWinElem *buf, msg packet)	{
-		
-}
-
-/*
- * Create Packet Queue
- */
-
 
 int main(int argc, char **argv)
 {	
@@ -285,14 +344,21 @@ send_1HS_again:
                 err_sys("\nconnect error\n");
 
 	/* Sending the 3-hand shake */
-	sleep(7);
+	sleep(4);
+	
 	msg pack_3HS;
 	hdr header3;
 	createHeader(&header3, SYN_ACK_HS3, 3, advwin, ts);
 	createMsgPacket(&pack_3HS, header3, NULL, 0);
+	
 	write(sockfd, &pack_3HS, sizeof(pack_3HS));    
-	printf("Sent third handshake, waiting for data from server  now \n");
-	recvFile(sockfd, servIP);
+
+	//printf("Sent third handshake, waiting for data from server  now \n");
+	recvQ queue;
+	
+	initRecvQueue(&queue, clientInfo->rec_Window, 3);
+	
+	recvFile(sockfd, &queue, servIP, clientInfo->rec_Window);
     
 }
 

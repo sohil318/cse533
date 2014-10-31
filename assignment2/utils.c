@@ -230,3 +230,16 @@ void createMsgPacket(msg *datapack, hdr header, char *buf, int len)
     datapack->len	   = len;
 }
 
+/*
+ * Function to create Ack Packet
+ */
+
+void createAckPacket(msg *ackpack, int msgtype, int ackno, int advwin, int ts)
+{
+    hdr header;
+    createHeader(&header, msgtype, ackno, advwin, ts);
+    ackpack->header	    = header;
+    memset(ackpack->payload, 0, PAYLOAD_CHUNK_SIZE);
+    ackpack->len	    = 0;
+}
+

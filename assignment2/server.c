@@ -7,6 +7,7 @@
 /*	Global	declarations	*/
 struct existing_connections *existing_conn;
 static sigjmp_buf jmpbuf;
+
 /* 
  * Function to check if client and server have same host network. 
  */
@@ -68,6 +69,21 @@ void createSenderElem (sendWinElem *elem, msg buf, int seqnum)	{
     elem->isPresent		=   1;					
 }
 
+/*
+ * Print the Sending Window
+ */
+
+void printSendingBuffer(sendQ *sendWin)	{
+    int i;
+    for (i = 0; i < sendWin->winsize ; i++)
+    {
+	if (sendWin->buffer[i].isPresent)
+	    printf("%5d", sendWin->buffer[i].seqnum);
+	else
+	    printf("   XX");
+    }	
+}
+
 /* 
  * Write file contents over the connection socket.
  */
@@ -77,7 +93,7 @@ void sendFile(int sockfd, char filename[PAYLOAD_CHUNK_SIZE], struct sockaddr_in 
     int fp, i;
     int seqnum = seqno, nbytes, advwin = adwin, ts = 0, msgtype;
     hdr header;
-    msg datapacket;
+    msg datapacket, ack;
     sendWinElem sendelem;
 
     fp = open(filename, O_RDONLY, S_IREAD);
@@ -109,7 +125,14 @@ void sendFile(int sockfd, char filename[PAYLOAD_CHUNK_SIZE], struct sockaddr_in 
 	    //printf("Sender Queue Elem seq Num : %d", sendWin->buffer[seqnum].packet.header.seq_num); 
 	    //printf("Sender Queue Elem data : %s", sendWin->buffer[seqnum].packet.payload); 
 	}
+	printf("Sending Seq # %d\n", datapacket.header.seq_num);
 	send(sockfd, &datapacket, sizeof(datapacket), 0);
+	recv(sockfd, &ack, sizeof(ack), 0);
+	printf("Ack # %d. Please Send Packet : %d", datapacket.header.seq_num, ack.header.seq_num);
+	printf("\tSender Window State : ");
+	printSendingBuffer(sendWin);
+	printf("\n");
+
 	seqnum++;
 
 	if (msgtype == FIN)
@@ -183,7 +206,7 @@ int childRequestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_in
     int sockfd, optval = -1, isLocal, newport;
     socklen_t len;
     struct sockaddr_in	servaddr, clientaddr, addr;
-    char src[128], buf[PACKET_SIZE];
+    char src[128], buf[PAYLOAD_CHUNK_SIZE];
 
     // Close other sockets except for the one 
     while(head != NULL)
@@ -250,7 +273,7 @@ int childRequestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_in
     createMsgPacket(&pack_2HS, header2, buf, sizeof(buf));
     int retransmit_attempt = 0;
 
-send_HS2_again:
+resend_HS2:
     sendto(sock, (void *)&pack_2HS, sizeof(pack_2HS), 0, (SA *)&client_addr, sizeof(client_addr));
     retransmit_attempt++;
 
@@ -265,7 +288,7 @@ send_HS2_again:
 	    exit(0);
 	}
 	printf("Request timed out. Retransmitting 2HS from both the ports now ...: attempt number: %d\n", retransmit_attempt);
-	goto send_HS2_again;
+	goto resend_HS2;
     }                                                                                                                                                                                                   
     alarm(3);
 
@@ -288,8 +311,9 @@ send_HS2_again:
     if(header3.msg_type == SYN_ACK_HS3){	
 	printf("\nReceived 3rd Hand Shake Successfully");
     }
-    sendFile(sockfd, filename, client_addr, sendWin, 3, 10);
 
+    printf("\n Start file transfer Seq number = %d, Initial Advertising window = %d\n", header3.seq_num, header3.adv_window);
+    sendFile(sockfd, filename, client_addr, sendWin, header3.seq_num, header3.adv_window);
 
 }
 
@@ -362,10 +386,11 @@ void listenInterfaces(struct servStruct *servInfo, sendQ *sendWin)
     socklen_t len;
 
     msg packet_1HS;
-    char msg[512];
+    char msg[PAYLOAD_CHUNK_SIZE];
     char src[128];
 
-    int 	maxfdpl = -1, nready, pid;
+    int maxfdpl = -1, nready, pid;
+    sigset_t signal_set;
 
     struct sockaddr_in clientInfo;
     struct InterfaceInfo *head  = servInfo->ifi_head;
@@ -416,7 +441,6 @@ void listenInterfaces(struct servStruct *servInfo, sendQ *sendWin)
 		    }
 		    else
 		    {
-			sigset_t signal_set;
 			sigemptyset(&signal_set);
 			sigaddset(&signal_set, SIGCHLD);
 			sigprocmask(SIG_BLOCK, &signal_set, NULL);
