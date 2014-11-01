@@ -43,7 +43,7 @@ static void alarm_handler (int signo)
 void initSenderQueue(sendQ *queue, int winsize)	{
     queue->buffer		=   (sendWinElem *) calloc (winsize, sizeof(sendWinElem));
     queue->winsize		=   winsize;
-    queue->cwinsize		=   5;				
+    queue->cwinsize		=   8;				
     queue->slidwinstart		=   0;				
     queue->slidwinend		=   0;
 }
@@ -112,7 +112,7 @@ void sendFile(int sockfd, char filename[PAYLOAD_CHUNK_SIZE], struct sockaddr_in 
 	{
 	    nbytes = read(fp, buf, PAYLOAD_CHUNK_SIZE-1);
 	    buf[nbytes] = '\0';
-	    //		printf("\nBuf : %s", buf);
+	    //printf("\nBuf : %s", buf);
 	    if (nbytes < PAYLOAD_CHUNK_SIZE - 1)
 		msgtype        = FIN;
 	    else

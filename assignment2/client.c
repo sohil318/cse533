@@ -2,7 +2,8 @@
 #include	 "unprtt.h"
 #include	 "client.h"
 #include	 <setjmp.h>
-
+#include	 <math.h>
+#include	 <pthread.h>
 #define LOOPBACK "127.0.0.1"
 
 /*
@@ -10,6 +11,11 @@
  */
 
 static sigjmp_buf jmpbuf;
+pthread_t producer_thread;
+pthread_t consumer_thread;
+static pthread_mutex_t lock_mutex;
+static int fin_recieved; 
+static clientStruct *clientInfo;
 
 int getSubnetCount(unsigned long netmsk)
 {
@@ -31,6 +37,17 @@ static void alarm_handler (int signo)
     siglongjmp(jmpbuf, 1);
 }
 
+int
+sleep_duration()
+{
+     double random_value;
+     int interval;
+     random_value = drand48();
+//     printf("randmo value %f: \n", random_value);
+     interval = (int)((-1) * log(random_value)* (clientInfo->recv_rate));
+//     printf("Sleep interval is: %d \n", interval);
+     return interval;
+} 
 
 /* 
  * Function to check if client and server have same host network. 
@@ -241,6 +258,7 @@ void recvFile(int sockfd, recvQ *queue, struct sockaddr_in serverInfo, int awin)
 	    //printf("Printinf Seq Num\n");
 	    recv(sockfd, &m, sizeof(m), 0);
 	    createRecvElem (&elem, m, m.header.seq_num);
+	    pthread_mutex_lock(&lock_mutex);  
 	    status = addToReceiverQueue(queue, elem);
 
 	    //printf("Printinf Seq Num %d", m.header.seq_num);
@@ -250,32 +268,70 @@ void recvFile(int sockfd, recvQ *queue, struct sockaddr_in serverInfo, int awin)
 	    printf("\tReceived Queue State \t"); 
 	    printReceivingBuffer(queue);
 	    printf("\n");
-	    if (m.header.msg_type == FIN)
-		msgtype = FIN_ACK;
-	    else
-		msgtype = DATA_ACK;
-	    
+	    if (m.header.msg_type == FIN){
+		    msgtype = FIN_ACK;
+		    fin_recieved = 1;
+		    printf("\n---------------------------Fin recieved in producer--------------------------\n");
+	    }    
+	    else {
+		    msgtype = DATA_ACK;
+	    }
 	    createAckPacket(&ack, msgtype, queue->advwinstart, queue->advwinsize, ts);
 	    send(sockfd, &ack, sizeof(ack), 0);
 	    
-	    if (m.header.msg_type == FIN)
-		break;
+	    pthread_mutex_unlock(&lock_mutex);
+	    //if (m.header.msg_type == FIN)
+	    //break;
 		//msgtype = FIN_ACK;
 	    //else
 		//msgtype = ACK;
-
 	}
 }
 
+void * recvFile1(void * arguments){
+	//printf("in producer thread.........hhhhhzzzz\n");
+	prodArgs *pArgs = (prodArgs *)arguments;
+	recvFile(pArgs->sockfd, pArgs->queue, pArgs->serverInfo, pArgs->awin);
+} 
+
+void * consumer_process(void *argQueue){
+	recvQ *queue = (recvQ *)argQueue;
+//	printf("In consumer thread process method\n");
+	while(1)    {
+	    printf("\n------------------------------------Inside consumer thread---------------------------------------\n");
+	    pthread_mutex_lock(&lock_mutex); 
+	    while((queue->readpacketidx < queue->advwinstart) && (queue->readpacketidx != -1) ) {
+		//printf("\n Adv Win start %d read packet idx %d\n", queue->advwinstart, queue->readpacketidx);
+		printf("%s", queue->buffer[queue->readpacketidx % queue->winsize].packet.payload);
+		queue->buffer[queue->readpacketidx % queue->winsize].isValid = 0;
+		queue->readpacketidx++;
+		queue->advwinsize++;
+	    }
+	    pthread_mutex_unlock(&lock_mutex); 
+	    if (fin_recieved == 1)
+		break;
+	    printf("\n---------------------------------Consumer thread going to sleep.------------------------------------\n");
+	    printf("\n");
+	    usleep(sleep_duration()*1000);
+	}
+    	if (fin_recieved == 1)
+    	{
+		printf("\n---------------------------Fin recieved. Consumer thread terminating and exiting---------------------\n");
+		exit(0);
+    	}
+
+}        																							
+
 int main(int argc, char **argv)
 {	
-	struct clientStruct  *clientInfo        =       loadClientInfo();
+	clientInfo        =       loadClientInfo();
         int isLocal, sockfd, advwin = 0, ts = 0;
 	char src[128];
 	char recvBuff[1024];	
 	struct sockaddr_in servIP;	
 	int retrans_times = 0;
 
+	srand48(clientInfo->seed);
 	Signal(SIGALRM, alarm_handler);
         
 	if (clientInfo)
@@ -344,7 +400,7 @@ send_1HS_again:
                 err_sys("\nconnect error\n");
 
 	/* Sending the 3-hand shake */
-	sleep(4);
+	//sleep(4);
 	
 	msg pack_3HS;
 	hdr header3;
@@ -359,8 +415,21 @@ send_1HS_again:
 	
 	initRecvQueue(&queue, clientInfo->rec_Window, 3);
 	
-	recvFile(sockfd, &queue, servIP, clientInfo->rec_Window);
+	prodArgs pArg;
+	pArg.sockfd = sockfd;
+	pArg.queue  = &queue;
+	pArg.serverInfo = servIP;
+	pArg.awin = clientInfo->rec_Window;
+	
+	pthread_mutex_init(&lock_mutex, NULL);
+	pthread_create(&producer_thread, NULL, recvFile1, (void *)&pArg);
+	pthread_create(&consumer_thread, NULL, consumer_process,(void *)&queue);    
+	 
+	pthread_join(producer_thread, NULL);
+	pthread_join(consumer_thread, NULL);
+
+	exit(0);
+//	recvFile(sockfd, &queue, servIP, clientInfo->rec_Window);
     
 }
-
 

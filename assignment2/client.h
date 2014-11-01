@@ -22,4 +22,12 @@ typedef struct ReceiverQueue	{
 	int		readpacketidx;				/*  Oldest Packet to read to output */
 } recvQ;
 
+/* struct for producer function args */
+typedef struct ProducerArg  {
+	int			sockfd;
+	recvQ			*queue;
+	struct sockaddr_in	serverInfo;
+	int			awin;
+} prodArgs;
+
 #endif	/* __client_h */
