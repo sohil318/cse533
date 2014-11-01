@@ -61,12 +61,40 @@ void addToSenderQueue(sendQ *queue, sendWinElem elem)	{
 /*
  * Create a Sender Queue Element
  */
+
 void createSenderElem (sendWinElem *elem, msg buf, int seqnum)	{
     //printf("Creating Element at seq num = %d", seqnum);
     elem->packet		=   buf;
     elem->seqnum		=   seqnum;					
     elem->retranx		=   0;					
-    elem->isPresent		=   1;					
+    elem->isPresent		=   1;
+    elem->isRetransmit		=   0;
+}
+
+/*
+ * Update the Retransmit count in sending Window
+ */
+void updateRetransmissionCount(sendQ *sendWin, int i)
+{
+    sendWin->buffer[ i % sendWin->winsize ].retranx++;
+}
+
+/*
+ * Set the Retransmit bit in sending Window
+ */
+
+void setRetransmitFlag(sendQ *sendWin, int i)
+{
+    sendWin->buffer[ i % sendWin->winsize ].isRetransmit = 1;
+}
+
+/*
+ * Reset the Present bit in Sending Window
+ */
+
+void resetRetransmitFlag(sendQ *sendWin, int i)
+{
+    sendWin->buffer[ i % sendWin->winsize ].isRetransmit = 0;
 }
 
 /*
@@ -125,6 +153,7 @@ void sendFile(int sockfd, char filename[PAYLOAD_CHUNK_SIZE], struct sockaddr_in 
     char buf[PAYLOAD_CHUNK_SIZE];
     int fp, i;
     int seqnum = seqno, nbytes, advwin = adwin, ts = 0, msgtype, cwindow;
+    int prevAck, dupAckCount = 0;
     hdr header;
     msg datapacket, ack;
     sendWinElem sendelem;
@@ -137,8 +166,17 @@ ackRcvdresendNewPacketsCongWin:
     printf("\n\nSending from %d packet,  %d number of packets.\n", seqnum, cwindow);
 
     for ( i = 0; i < cwindow; i++)	{
-
-	if (seqnum <= sendWin->slidwinend || sendWin->buffer[i].isPresent == 1)
+	
+	/* Check Retransx Flag */
+	if (sendWin->buffer[seqnum % sendWin->winsize].isRetransmit == 1)
+	{
+	    printf("\nRe-Sending Seq # %d", seqnum);
+	    datapacket = sendWin->buffer[seqnum % sendWin->winsize].packet;
+	    send(sockfd, &datapacket, sizeof(datapacket), 0);
+	    resetRetransmitFlag(sendWin, seqnum);
+	    updateRetransmissionCount(sendWin, seqnum);
+	}
+	else if (seqnum <= sendWin->slidwinend || sendWin->buffer[seqnum % sendWin->winsize].isPresent == 1) 
 	{	
 	    /* Packet is already in transit */
 	    printf("\nSkipping Packet : %d", seqnum);
@@ -150,6 +188,7 @@ ackRcvdresendNewPacketsCongWin:
 	}
 	else
 	{
+//	    printf("\nPreparing Sending Packet : %d", seqnum);
 	    if (seqnum > sendWin->slidwinend)
 		sendWin->slidwinend = seqnum;
 
@@ -174,7 +213,8 @@ ackRcvdresendNewPacketsCongWin:
 	printSendingBuffer(sendWin);
 	//printf("\n");
 
-	seqnum++;
+	seqnum = seqnum + 1;
+//	printf("New Seq Number :%d", seqnum);
 
 	if (msgtype == FIN)
 	    break;
@@ -199,7 +239,18 @@ ackRcvdresendNewPacketsCongWin:
 	while (1)
 	{
 	    recv(sockfd, &ack, sizeof(ack), 0);
+
+	    if (prevAck == ack.header.seq_num)
+		dupAckCount++;
+	    else
+	    {
+		prevAck = ack.header.seq_num;
+		dupAckCount = 1;
+	    }    
 	    
+	    if (dupAckCount == 3)
+		setRetransmitFlag(sendWin, ack.header.seq_num);
+
 	    printf("\nAck # %d received. Adv Win : %d", ack.header.seq_num - 1, ack.header.adv_window);
 	    if (ack.header.seq_num == sendWin->slidwinstart + 1)
 	    {
@@ -219,6 +270,18 @@ ackRcvdresendNewPacketsCongWin:
     {
 	//printf("\nReceiving Ack #");
 	recv(sockfd, &ack, sizeof(ack), 0);
+	
+	if (prevAck == ack.header.seq_num)
+	    dupAckCount++;
+	else
+	{
+	    prevAck = ack.header.seq_num;
+	    dupAckCount = 1;
+	}    
+	
+	if (dupAckCount == 3)
+	    setRetransmitFlag(sendWin, ack.header.seq_num);
+	        
 	if (ack.header.seq_num == sendWin->slidwinstart + 1)
 	{
 	    resetPresentFlag(sendWin, ack.header.seq_num - 1);
