@@ -40,12 +40,12 @@ static void alarm_handler (int signo)
  * Initialize Sender Queue 
  */
 
-void initSenderQueue(sendQ *queue, int winsize)	{
+void initSenderQueue(sendQ *queue, int winsize, int slidwinstart)	{
     queue->buffer		=   (sendWinElem *) calloc (winsize, sizeof(sendWinElem));
     queue->winsize		=   winsize;
-    queue->cwinsize		=   8;				
-    queue->slidwinstart		=   0;				
-    queue->slidwinend		=   0;
+    queue->cwinsize		=   3;				
+    queue->slidwinstart		=   slidwinstart;				
+    queue->slidwinend		=   -1;  /// slidwinstart + queue->cwinsize;
 }
 
 /*
@@ -61,12 +61,72 @@ void addToSenderQueue(sendQ *queue, sendWinElem elem)	{
 /*
  * Create a Sender Queue Element
  */
+
 void createSenderElem (sendWinElem *elem, msg buf, int seqnum)	{
     //printf("Creating Element at seq num = %d", seqnum);
     elem->packet		=   buf;
     elem->seqnum		=   seqnum;					
     elem->retranx		=   0;					
-    elem->isPresent		=   1;					
+    elem->isPresent		=   1;
+    elem->isRetransmit		=   0;
+}
+
+/*
+ * Update the Retransmit count in sending Window
+ */
+void updateRetransmissionCount(sendQ *sendWin, int i)
+{
+    sendWin->buffer[ i % sendWin->winsize ].retranx++;
+}
+
+/*
+ * Set the Retransmit bit in sending Window
+ */
+
+void setRetransmitFlag(sendQ *sendWin, int i)
+{
+    sendWin->buffer[ i % sendWin->winsize ].isRetransmit = 1;
+}
+
+/*
+ * Reset the Present bit in Sending Window
+ */
+
+void resetRetransmitFlag(sendQ *sendWin, int i)
+{
+    sendWin->buffer[ i % sendWin->winsize ].isRetransmit = 0;
+}
+
+/*
+ * Set the Present bit in sending Window
+ */
+
+void setPresentFlag(sendQ *sendWin, int i)
+{
+    sendWin->buffer[ i % sendWin->winsize ].isPresent = 1;
+}
+
+/*
+ * Reset the Present bit in Sending Window
+ */
+
+void resetPresentFlag(sendQ *sendWin, int i)
+{
+    sendWin->buffer[ i % sendWin->winsize ].isPresent = 0;
+}
+
+/*
+ * Minimum of 3 numbers
+ */
+
+int minWin(int x, int y, int z)
+{
+    if ( x <= y && x <= z )
+	return x;
+    else if ( y <= z && y <= x )
+	return y;
+
+    return z;
 }
 
 /*
@@ -78,10 +138,11 @@ void printSendingBuffer(sendQ *sendWin)	{
     for (i = 0; i < sendWin->winsize ; i++)
     {
 	if (sendWin->buffer[i].isPresent)
-	    printf("%5d", sendWin->buffer[i].seqnum);
+	    printf("%8d", sendWin->buffer[i].seqnum);
 	else
-	    printf("   XX");
+	    printf("    XXXX");
     }	
+	    printf("\n");
 }
 
 /* 
@@ -91,25 +152,46 @@ void printSendingBuffer(sendQ *sendWin)	{
 void sendFile(int sockfd, char filename[PAYLOAD_CHUNK_SIZE], struct sockaddr_in client_addr, sendQ *sendWin, int seqno, int adwin)	{
     char buf[PAYLOAD_CHUNK_SIZE];
     int fp, i;
-    int seqnum = seqno, nbytes, advwin = adwin, ts = 0, msgtype;
+    int seqnum = seqno, nbytes, advwin = adwin, ts = 0, msgtype, cwindow;
+    int prevAck, dupAckCount = 0;
     hdr header;
     msg datapacket, ack;
     sendWinElem sendelem;
 
     fp = open(filename, O_RDONLY, S_IREAD);
+    
+ackRcvdresendNewPacketsCongWin:
+    
+    cwindow = minWin(adwin, sendWin->cwinsize, sendWin->winsize);
+    printf("\n\nSending from %d packet,  %d number of packets.\n", seqnum, cwindow);
 
-    for ( i = 0; i < sendWin->cwinsize; i++)	{
-
-	if (seqnum <= sendWin->slidwinend)
+    for ( i = 0; i < cwindow; i++)	{
+	
+	/* Check Retransx Flag */
+	if (sendWin->buffer[seqnum % sendWin->winsize].isRetransmit == 1)
+	{
+	    printf("\nRe-Sending Seq # %d", seqnum);
+	    datapacket = sendWin->buffer[seqnum % sendWin->winsize].packet;
+	    send(sockfd, &datapacket, sizeof(datapacket), 0);
+	    resetRetransmitFlag(sendWin, seqnum);
+	    updateRetransmissionCount(sendWin, seqnum);
+	}
+	else if (seqnum <= sendWin->slidwinend || sendWin->buffer[seqnum % sendWin->winsize].isPresent == 1) 
 	{	
-	    /* Need to resend the packet */
-	    sendelem = sendWin->buffer[ seqnum % sendWin->winsize ];
-	    sendelem.retranx++;
-	    datapacket = sendelem.packet;
-	    sendWin->buffer[ seqnum % sendWin->winsize ] = sendelem;
+	    /* Packet is already in transit */
+	    printf("\nSkipping Packet : %d", seqnum);
+
+//	    sendelem = sendWin->buffer[ seqnum % sendWin->winsize ];
+//	    sendelem.retranx++;
+//	    datapacket = sendelem.packet;
+//	    sendWin->buffer[ seqnum % sendWin->winsize ] = sendelem;
 	}
 	else
 	{
+//	    printf("\nPreparing Sending Packet : %d", seqnum);
+	    if (seqnum > sendWin->slidwinend)
+		sendWin->slidwinend = seqnum;
+
 	    nbytes = read(fp, buf, PAYLOAD_CHUNK_SIZE-1);
 	    buf[nbytes] = '\0';
 	    //printf("\nBuf : %s", buf);
@@ -124,22 +206,99 @@ void sendFile(int sockfd, char filename[PAYLOAD_CHUNK_SIZE], struct sockaddr_in 
 	    addToSenderQueue(sendWin, sendelem);
 	    //printf("Sender Queue Elem seq Num : %d", sendWin->buffer[seqnum].packet.header.seq_num); 
 	    //printf("Sender Queue Elem data : %s", sendWin->buffer[seqnum].packet.payload); 
+	    printf("\nSending Seq # %d", datapacket.header.seq_num);
+	    send(sockfd, &datapacket, sizeof(datapacket), 0);
 	}
-	printf("Sending Seq # %d\n", datapacket.header.seq_num);
-	send(sockfd, &datapacket, sizeof(datapacket), 0);
-	recv(sockfd, &ack, sizeof(ack), 0);
-	printf("Ack # %d. Please Send Packet : %d", datapacket.header.seq_num, ack.header.seq_num);
-	printf("\tSender Window State : ");
+	printf("\n\tSender Window State : ");
 	printSendingBuffer(sendWin);
-	printf("\n");
+	//printf("\n");
 
-	seqnum++;
+	seqnum = seqnum + 1;
+//	printf("New Seq Number :%d", seqnum);
 
 	if (msgtype == FIN)
 	    break;
+	
 	bzero(&buf, PAYLOAD_CHUNK_SIZE);
 	bzero(&datapacket, sizeof(datapacket));
+
     }
+
+//    recv(sockfd, &ack, sizeof(ack), 0);
+/*    if (ack.header.seq_num == sendWin->slidwinstart + 1)
+    {
+	resetPresentFlag(sendWin, ack.header.seq_num - 1);
+//	sendWin->buffer[ack.header.seq_num % sendWin->winsize].isPresent = 0;
+	sendWin->slidwinstart++;
+    }
+    if (ack.header.msg_type == FIN_ACK)
+	return;
+*/
+    if (msgtype == FIN)
+    {
+	while (1)
+	{
+	    recv(sockfd, &ack, sizeof(ack), 0);
+
+	    if (prevAck == ack.header.seq_num)
+		dupAckCount++;
+	    else
+	    {
+		prevAck = ack.header.seq_num;
+		dupAckCount = 1;
+	    }    
+	    
+	    if (dupAckCount == 3)
+		setRetransmitFlag(sendWin, ack.header.seq_num);
+
+	    printf("\nAck # %d received. Adv Win : %d", ack.header.seq_num - 1, ack.header.adv_window);
+	    if (ack.header.seq_num == sendWin->slidwinstart + 1)
+	    {
+		resetPresentFlag(sendWin, ack.header.seq_num - 1);
+//		sendWin->buffer[ack.header.seq_num % sendWin->winsize].isPresent = 0;
+		sendWin->slidwinstart++;
+	    }
+	    printf("\n\tSender Window State : ");
+	    printSendingBuffer(sendWin);
+
+	    if (ack.header.msg_type == FIN_ACK)
+		break;
+	    
+	}
+    }
+    else
+    {
+	//printf("\nReceiving Ack #");
+	recv(sockfd, &ack, sizeof(ack), 0);
+	
+	if (prevAck == ack.header.seq_num)
+	    dupAckCount++;
+	else
+	{
+	    prevAck = ack.header.seq_num;
+	    dupAckCount = 1;
+	}    
+	
+	if (dupAckCount == 3)
+	    setRetransmitFlag(sendWin, ack.header.seq_num);
+	        
+	if (ack.header.seq_num == sendWin->slidwinstart + 1)
+	{
+	    resetPresentFlag(sendWin, ack.header.seq_num - 1);
+//	    sendWin->buffer[ack.header.seq_num % sendWin->winsize].isPresent = 0;
+	    sendWin->slidwinstart++;
+	}
+	sendWin->cwinsize += 1;
+	seqnum = ack.header.seq_num;    //sendWin->slidwinend;
+	adwin = ack.header.adv_window;
+	//sendWin->slidwinend += 2;
+	printf("\nAck # %d. Adv. Window # %d .  Please start sending : %d packets from seqnum : %d", ack.header.seq_num - 1, ack.header.adv_window, sendWin->cwinsize, ack.header.seq_num);
+	printf("\n\tSender Window State : ");
+	printSendingBuffer(sendWin);
+
+	goto ackRcvdresendNewPacketsCongWin;
+    }
+    
 }
 
 /* 
@@ -428,13 +587,13 @@ void listenInterfaces(struct servStruct *servInfo, sendQ *sendWin)
 		hdr header1 = packet_1HS.header;
 		if(header1.msg_type == SYN_HS1)	{
 		    printf("\n1 Handshake recieved from client \n");
-		    printf("Filename requested for transfer by the client: %s \n", packet_1HS.payload);
 		}
 		if( existing_connection(&clientInfo) == 1 ) { 
 		    printf("Duplicate connection request!");
 		}
 		else {
 		    if ((pid = fork()) == 0)    {
+			printf("Filename requested for transfer by the client: %s \n", packet_1HS.payload);
 			//                                              printf("\nClient Request Handler forked .");
 			childRequestHandler(head->sockfd, interfaceList, clientInfo, packet_1HS.payload, sendWin);
 			exit(0);
@@ -465,6 +624,6 @@ int main(int argc, char **argv)
     struct servStruct *servInfo = loadServerInfo();
     existing_connections *existing_conn = NULL;
 
-    initSenderQueue(&sendWin, servInfo->send_Window);
+    initSenderQueue(&sendWin, servInfo->send_Window, 3);
     listenInterfaces (servInfo, &sendWin);
 }

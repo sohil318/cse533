@@ -204,18 +204,24 @@ void createRecvElem (recvWinElem *elem, msg datapacket, int seqnum)	{
  */
 
 int addToReceiverQueue(recvQ *queue, recvWinElem elem)	{
-    //printf("\nAdded To Receiver Queue Seq Num : %d ", elem.seqnum);
+    printf("\nAdded To Receiver Queue Seq Num : %d ", elem.seqnum);
     int idx = elem.seqnum % queue->winsize;
     if (queue->buffer[idx].isValid == 0)
     {
 	if (queue->readpacketidx == -1)
-	    queue->readpacketidx = idx;
+	    queue->readpacketidx = elem.seqnum;
     
 	queue->buffer[idx]	    =	elem;
 	queue->buffer[idx].isValid  =	1;
 	if (queue->advwinstart == elem.seqnum)
 	{
 	    queue->advwinsize--;
+	    if (queue->advwinsize == 0)
+	    {
+		queue->advwinstart++;
+		printf("\nReciever Buffer is full. Waiting for consumer thread to read data.");
+		return 1;
+	    }
 	    while (queue->buffer[ ++queue->advwinstart % queue->winsize ].isValid)
 	    {
 		queue->advwinsize--;
@@ -237,10 +243,12 @@ void printReceivingBuffer(recvQ *recvWin)	{
     for (i = 0; i < recvWin->winsize ; i++)
     {
 	if (recvWin->buffer[i].isValid)
-	    printf("%5d", recvWin->buffer[i].seqnum);
+	    printf("%8d", recvWin->buffer[i].seqnum);
 	else
-	    printf("   XX");
+	    printf("    XXXX");
     }	
+	    printf("\n");
+
 }
 
 /* 
@@ -265,7 +273,7 @@ void recvFile(int sockfd, recvQ *queue, struct sockaddr_in serverInfo, int awin)
 	    //printf("Printinf Payload %s", m.payload);
 	    //printf("%s", m.payload);
 	    printf("Received Packet : %d", m.header.seq_num);
-	    printf("\tReceived Queue State \t"); 
+	    printf("\nReceived Queue State \t"); 
 	    printReceivingBuffer(queue);
 	    printf("\n");
 	    if (m.header.msg_type == FIN){
@@ -307,6 +315,7 @@ void * consumer_process(void *argQueue){
 		queue->readpacketidx++;
 		queue->advwinsize++;
 	    }
+	    printf("\n New Adv Window Size after consumer thread has read : %d", queue->advwinsize);
 	    pthread_mutex_unlock(&lock_mutex); 
 	    if (fin_recieved == 1)
 		break;
