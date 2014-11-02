@@ -167,6 +167,7 @@ ackRcvdresendNewPacketsCongWin:
     {
 	while (1)
 	{
+	    sleep(1);
 	    createCheckWinPacket(&checkWin, WIN_CHECK, seqnum, adwin, ts);
 	    send(sockfd, &checkWin, sizeof(checkWin), 0);
 	    recv(sockfd, &checkWinAck, sizeof(checkWinAck), 0);

@@ -310,22 +310,35 @@ void * recvFile1(void * arguments){
 void * consumer_process(void *argQueue){
 	recvQ *queue = (recvQ *)argQueue;
 //	printf("In consumer thread process method\n");
-	while(1)    {
-	    printf("\n------------------------------------Inside consumer thread---------------------------------------\n");
-	    pthread_mutex_lock(&lock_mutex); 
-	    while((queue->readpacketidx < queue->advwinstart) && (queue->readpacketidx != -1) ) {
-		//printf("\n Adv Win start %d read packet idx %d\n", queue->advwinstart, queue->readpacketidx);
-		printf("%s", queue->buffer[queue->readpacketidx % queue->winsize].packet.payload);
-		queue->buffer[queue->readpacketidx % queue->winsize].isValid = 0;
-		queue->readpacketidx++;
-		queue->advwinsize++;
+	while(1)    
+	{
+	    
+	    if (queue->advwinsize == queue->winsize)
+	    {
+		/* No Data in Receiving Buffer */
 	    }
-	    printf("\n New Adv Window Size after consumer thread has read : %d", queue->advwinsize);
-	    pthread_mutex_unlock(&lock_mutex); 
-	    if (fin_recieved == 1)
-		break;
-	    printf("\n---------------------------------Consumer thread going to sleep.------------------------------------\n");
-	    printf("\n");
+	    else
+	    {
+		printf("\n------------------------------------Inside consumer thread---------------------------------------\n");
+		pthread_mutex_lock(&lock_mutex); 
+	    
+		while  ((queue->readpacketidx < queue->advwinstart) && (queue->readpacketidx != -1) ) 
+		{
+		    //printf("\n Adv Win start %d read packet idx %d\n", queue->advwinstart, queue->readpacketidx);
+		    printf("%s", queue->buffer[queue->readpacketidx % queue->winsize].packet.payload);
+		    queue->buffer[queue->readpacketidx % queue->winsize].isValid = 0;
+		    queue->readpacketidx++;
+		    queue->advwinsize++;
+		}
+	    
+		printf("\n New Adv Window Size after consumer thread has read : %d", queue->advwinsize);
+	
+		pthread_mutex_unlock(&lock_mutex); 
+		if (fin_recieved == 1)
+		    break;
+	    
+		printf("\n---------------------------------Consumer thread going to sleep.------------------------------------\n\n");
+	    }
 	    usleep(sleep_duration()*1000);
 	}
     	if (fin_recieved == 1)
