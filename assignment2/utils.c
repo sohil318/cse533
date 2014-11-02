@@ -243,3 +243,29 @@ void createAckPacket(msg *ackpack, int msgtype, int ackno, int advwin, int ts)
     ackpack->len	    = 0;
 }
 
+/*
+ * Function to check Window Packet
+ */
+
+void createCheckWinPacket(msg *pack, int msgtype, int ackno, int advwin, int ts)
+{
+    hdr header;
+    createHeader(&header, msgtype, ackno, advwin, ts);
+    pack->header	    =	header;
+    memset(pack->payload, 0, PAYLOAD_CHUNK_SIZE);
+    pack->len		    =	0;
+}
+
+/*
+ * Function to check Window Packet
+ */
+
+void createWinUpdatePacket(msg *pack, int msgtype, int ackno, int advwin, int ts)
+{
+    hdr header;
+    createHeader(&header, msgtype, ackno, advwin, ts);
+    pack->header	    =	header;
+    memset(pack->payload, 0, PAYLOAD_CHUNK_SIZE);
+    pack->len		    =	0;
+}
+

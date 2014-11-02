@@ -257,7 +257,7 @@ void printReceivingBuffer(recvQ *recvWin)	{
 
 void recvFile(int sockfd, recvQ *queue, struct sockaddr_in serverInfo, int awin)
 {
-	msg m, ack;
+	msg m, ack, updateWin;
 	recvWinElem elem;
 	int msgtype, advwin = awin, ts = 0, status;
 	printf("\nData Received on Client : \n");
@@ -265,9 +265,19 @@ void recvFile(int sockfd, recvQ *queue, struct sockaddr_in serverInfo, int awin)
 	{
 	    //printf("Printinf Seq Num\n");
 	    recv(sockfd, &m, sizeof(m), 0);
+	    if (m.header.msg_type == WIN_CHECK) 
+	    {
+		if (queue->advwinsize > 0)	
+		{
+		    createWinUpdatePacket(&updateWin, WIN_UPDATE, queue->readpacketidx, queue->advwinsize, ts);
+		    send(sockfd, &updateWin, sizeof(updateWin), 0);
+		    continue;
+		}
+	    }
 	    createRecvElem (&elem, m, m.header.seq_num);
 	    pthread_mutex_lock(&lock_mutex);  
 	    status = addToReceiverQueue(queue, elem);
+	    pthread_mutex_unlock(&lock_mutex);
 
 	    //printf("Printinf Seq Num %d", m.header.seq_num);
 	    //printf("Printinf Payload %s", m.payload);
@@ -287,17 +297,12 @@ void recvFile(int sockfd, recvQ *queue, struct sockaddr_in serverInfo, int awin)
 	    createAckPacket(&ack, msgtype, queue->advwinstart, queue->advwinsize, ts);
 	    send(sockfd, &ack, sizeof(ack), 0);
 	    
-	    pthread_mutex_unlock(&lock_mutex);
-	    //if (m.header.msg_type == FIN)
-	    //break;
-		//msgtype = FIN_ACK;
-	    //else
-		//msgtype = ACK;
+//	    if (m.header.msg_type == FIN)
+//		break;
 	}
 }
 
 void * recvFile1(void * arguments){
-	//printf("in producer thread.........hhhhhzzzz\n");
 	prodArgs *pArgs = (prodArgs *)arguments;
 	recvFile(pArgs->sockfd, pArgs->queue, pArgs->serverInfo, pArgs->awin);
 } 

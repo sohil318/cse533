@@ -142,7 +142,7 @@ void printSendingBuffer(sendQ *sendWin)	{
 	else
 	    printf("    XXXX");
     }	
-	    printf("\n");
+    printf("\n");
 }
 
 /* 
@@ -155,18 +155,35 @@ void sendFile(int sockfd, char filename[PAYLOAD_CHUNK_SIZE], struct sockaddr_in 
     int seqnum = seqno, nbytes, advwin = adwin, ts = 0, msgtype, cwindow;
     int prevAck, dupAckCount = 0;
     hdr header;
-    msg datapacket, ack;
+    msg datapacket, ack, checkWin, checkWinAck;
     sendWinElem sendelem;
 
     fp = open(filename, O_RDONLY, S_IREAD);
-    
+
 ackRcvdresendNewPacketsCongWin:
-    
+
+    if (adwin == 0)
+    {
+	while (1)
+	{
+	    createCheckWinPacket(&checkWin, WIN_CHECK, seqnum, adwin, ts);
+	    send(sockfd, &checkWin, sizeof(checkWin), 0);
+	    recv(sockfd, &checkWinAck, sizeof(checkWinAck), 0);
+	    if(checkWinAck.header.seq_num == seqnum && checkWinAck.header.msg_type == WIN_UPDATE)
+	    {
+		adwin = checkWinAck.header.adv_window;
+		if (adwin > 0)
+		    break;
+	    }
+	}
+    }
     cwindow = minWin(adwin, sendWin->cwinsize, sendWin->winsize);
+
+    
     printf("\n\nSending from %d packet,  %d number of packets.\n", seqnum, cwindow);
 
     for ( i = 0; i < cwindow; i++)	{
-	
+
 	/* Check Retransx Flag */
 	if (sendWin->buffer[seqnum % sendWin->winsize].isRetransmit == 1)
 	{
@@ -181,14 +198,14 @@ ackRcvdresendNewPacketsCongWin:
 	    /* Packet is already in transit */
 	    printf("\nSkipping Packet : %d", seqnum);
 
-//	    sendelem = sendWin->buffer[ seqnum % sendWin->winsize ];
-//	    sendelem.retranx++;
-//	    datapacket = sendelem.packet;
-//	    sendWin->buffer[ seqnum % sendWin->winsize ] = sendelem;
+	    //	    sendelem = sendWin->buffer[ seqnum % sendWin->winsize ];
+	    //	    sendelem.retranx++;
+	    //	    datapacket = sendelem.packet;
+	    //	    sendWin->buffer[ seqnum % sendWin->winsize ] = sendelem;
 	}
 	else
 	{
-//	    printf("\nPreparing Sending Packet : %d", seqnum);
+	    //	    printf("\nPreparing Sending Packet : %d", seqnum);
 	    if (seqnum > sendWin->slidwinend)
 		sendWin->slidwinend = seqnum;
 
@@ -214,26 +231,26 @@ ackRcvdresendNewPacketsCongWin:
 	//printf("\n");
 
 	seqnum = seqnum + 1;
-//	printf("New Seq Number :%d", seqnum);
+	//	printf("New Seq Number :%d", seqnum);
 
 	if (msgtype == FIN)
 	    break;
-	
+
 	bzero(&buf, PAYLOAD_CHUNK_SIZE);
 	bzero(&datapacket, sizeof(datapacket));
 
     }
 
-//    recv(sockfd, &ack, sizeof(ack), 0);
-/*    if (ack.header.seq_num == sendWin->slidwinstart + 1)
-    {
-	resetPresentFlag(sendWin, ack.header.seq_num - 1);
-//	sendWin->buffer[ack.header.seq_num % sendWin->winsize].isPresent = 0;
-	sendWin->slidwinstart++;
+    //    recv(sockfd, &ack, sizeof(ack), 0);
+    /*    if (ack.header.seq_num == sendWin->slidwinstart + 1)
+	  {
+	  resetPresentFlag(sendWin, ack.header.seq_num - 1);
+    //	sendWin->buffer[ack.header.seq_num % sendWin->winsize].isPresent = 0;
+    sendWin->slidwinstart++;
     }
     if (ack.header.msg_type == FIN_ACK)
-	return;
-*/
+    return;
+    */
     if (msgtype == FIN)
     {
 	while (1)
@@ -247,7 +264,7 @@ ackRcvdresendNewPacketsCongWin:
 		prevAck = ack.header.seq_num;
 		dupAckCount = 1;
 	    }    
-	    
+
 	    if (dupAckCount == 3)
 		setRetransmitFlag(sendWin, ack.header.seq_num);
 
@@ -255,7 +272,7 @@ ackRcvdresendNewPacketsCongWin:
 	    if (ack.header.seq_num == sendWin->slidwinstart + 1)
 	    {
 		resetPresentFlag(sendWin, ack.header.seq_num - 1);
-//		sendWin->buffer[ack.header.seq_num % sendWin->winsize].isPresent = 0;
+		//		sendWin->buffer[ack.header.seq_num % sendWin->winsize].isPresent = 0;
 		sendWin->slidwinstart++;
 	    }
 	    printf("\n\tSender Window State : ");
@@ -263,14 +280,14 @@ ackRcvdresendNewPacketsCongWin:
 
 	    if (ack.header.msg_type == FIN_ACK)
 		break;
-	    
+
 	}
     }
     else
     {
 	//printf("\nReceiving Ack #");
 	recv(sockfd, &ack, sizeof(ack), 0);
-	
+
 	if (prevAck == ack.header.seq_num)
 	    dupAckCount++;
 	else
@@ -278,14 +295,14 @@ ackRcvdresendNewPacketsCongWin:
 	    prevAck = ack.header.seq_num;
 	    dupAckCount = 1;
 	}    
-	
+
 	if (dupAckCount == 3)
 	    setRetransmitFlag(sendWin, ack.header.seq_num);
-	        
+
 	if (ack.header.seq_num == sendWin->slidwinstart + 1)
 	{
 	    resetPresentFlag(sendWin, ack.header.seq_num - 1);
-//	    sendWin->buffer[ack.header.seq_num % sendWin->winsize].isPresent = 0;
+	    //	    sendWin->buffer[ack.header.seq_num % sendWin->winsize].isPresent = 0;
 	    sendWin->slidwinstart++;
 	}
 	sendWin->cwinsize += 1;
@@ -298,7 +315,7 @@ ackRcvdresendNewPacketsCongWin:
 
 	goto ackRcvdresendNewPacketsCongWin;
     }
-    
+
 }
 
 /* 

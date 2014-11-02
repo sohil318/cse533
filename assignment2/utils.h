@@ -8,7 +8,8 @@
 #define ACK_HS2		    2
 #define SYN_ACK_HS3	    3
 
-#define WIN_UPDATE	    4
+#define WIN_CHECK	    4
+#define WIN_UPDATE	    5
 
 #define DATA_PAYLOAD	    11
 #define DATA_ACK	    12
