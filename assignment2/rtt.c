@@ -21,18 +21,15 @@ rtt_minmax(uint32_t rto)
 }
 
 /* to start the timer for given milliseconds */
-//void
-//rtt_start_timer(long int ms){
-//    struct itimerval timer;
-//    /* Configure the timer to expire after 'ms' msec... */
-//    timer.it_value.tv_sec = ms / 1000;
-//    timer.it_value.tv_usec = (ms % 1000) * 1000;
-//    /* and every 0 msec after that. */
-//    timer.it_interval.tv_sec = 0;
-//    timer.it_interval.tv_usec = 0;
-//    /* start r */
-//    setitimer (ITIMER_REAL, &timer, 0);
-//}
+void
+rtt_set_timer(long int ms){
+    struct itimerval itimer;
+    itimer.it_value.tv_sec = ms / 1000;
+    itimer.it_value.tv_usec = (ms % 1000) * 1000;
+    itimer.it_interval.tv_sec = 0;
+    itimer.it_interval.tv_usec = 0;
+    setitimer (ITIMER_REAL, &itimer, 0);
+}
 
 void
 rtt_init(struct rtt_info *ptr)
@@ -71,7 +68,7 @@ rtt_ts(struct rtt_info *ptr)
 void
 rtt_newpack(struct rtt_info *ptr)
 {
-	ptr->rtt_nrexmt = 0;
+//	ptr->rtt_nrexmt = 0;
 }
 
 int
@@ -151,13 +148,13 @@ rtt_stop(struct rtt_info *ptr, uint32_t ms)
 
 /* includle rtt_timeout */
 int
-rtt_timeout(struct rtt_info *ptr)
+rtt_timeout(struct rtt_info *ptr, int retransmit)
 {
 	ptr->rtt_rto = ptr->rtt_rto<< 1;		/* next RTO */
-        printf("%d", ptr->rtt_nrexmt);	
+      //  printf("%d", ptr->rtt_nrexmt);	
 	ptr->rtt_rto = rtt_minmax(ptr->rtt_rto);
 	
-	if (++ptr->rtt_nrexmt > RTT_MAXNREXMT)
+	if (retransmit > RTT_MAXNREXMT)
 		return(-1);			/* time to give up for this packet */
 	return(0);
 }
