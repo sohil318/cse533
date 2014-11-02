@@ -2,11 +2,11 @@
 #include	 "server.h"
 #include         <setjmp.h>
 #include	 "unprtt.h"
-#define LOOPBACK "127.0.0.1"
+#define		 LOOPBACK   "127.0.0.1"
 
 /*	Global	declarations	*/
 struct existing_connections *existing_conn;
-static sigjmp_buf jmpbuf;
+static sigjmp_buf jmpbuf1, jmpbuf2;
 static struct rtt_info rttinfo;
 
 /* 
@@ -31,10 +31,20 @@ int checkLocal (struct sockaddr_in serverIP, struct sockaddr_in serverIPnmsk, st
  * SIGNAL ALARM Handler
  */
 
-static void alarm_handler (int signo)
+static void alarm_handler1 (int signo)
 {
     //    printf("in child alarm handler for 2 hs\n");
-    siglongjmp(jmpbuf, 1);
+    siglongjmp(jmpbuf1, 1);
+}
+
+/*
+ * SIGNAL ALARM Handler
+ */
+
+static void alarm_handler2 (int signo)
+{
+    //    printf("in child alarm handler for 2 hs\n");
+    siglongjmp(jmpbuf2, 1);
 }
 
 /*
@@ -160,11 +170,12 @@ void printSendingBuffer(sendQ *sendWin)	{
  * Write file contents over the connection socket.
  */
 
-void sendFile(int sockfd, char filename[PAYLOAD_CHUNK_SIZE], struct sockaddr_in client_addr, sendQ *sendWin, int seqno, int adwin)	{
+void sendFile(int sockfd, char filename[PAYLOAD_CHUNK_SIZE], struct sockaddr_in client_addr, sendQ *sendWin, int seqno, int adwin)	
+{
     char buf[PAYLOAD_CHUNK_SIZE];
     int fp, i, finseq = 65536;
     int seqnum = seqno, nbytes, advwin = adwin, ts = 0, msgtype, cwindow, isRetransmit = 0;
-    int prevAck = -1, dupAckCount = 0;
+    int prevAck = -1, dupAckCount = 0, sendPack = 0;
     hdr header;
     msg datapacket, ack, checkWin, checkWinAck;
     sendWinElem sendelem;
@@ -191,7 +202,7 @@ ackRcvdresendNewPacketsCongWin:
     }
     cwindow = minWin(adwin, sendWin->cwinsize, sendWin->winsize);
 
-    
+
     printf("\n\nSending from %d packet,  %d number of packets.\n", seqnum, cwindow);
 
     for ( i = 0; i < cwindow && seqnum <= finseq; i++)	{
@@ -199,20 +210,14 @@ ackRcvdresendNewPacketsCongWin:
 	/* Check Retransx Flag */
 	if (isRetransmit == 1)
 	{
-	    printf("\nRe-Sending Seq # %d", seqnum);
 	    datapacket = sendWin->buffer[seqnum % sendWin->winsize].packet;
-	    send(sockfd, &datapacket, sizeof(datapacket), 0);
-	    updateRetransmissionCount(sendWin, seqnum);
+	    printf("\nRe-Sending Seq # %d", datapacket.header.seq_num);
+	    sendPack = 1;
 	}
 	else if (seqnum <= sendWin->slidwinend || sendWin->buffer[seqnum % sendWin->winsize].isPresent == 1) 
 	{	
 	    /* Packet is already in transit */
 	    printf("\nSkipping Packet : %d", seqnum);
-	    msgtype = getMsgType(sendWin, seqnum);
-	    //	    sendelem = sendWin->buffer[ seqnum % sendWin->winsize ];
-	    //	    sendelem.retranx++;
-	    //	    datapacket = sendelem.packet;
-	    //	    sendWin->buffer[ seqnum % sendWin->winsize ] = sendelem;
 	}
 	else //if (isFin != 1)
 	{
@@ -235,20 +240,23 @@ ackRcvdresendNewPacketsCongWin:
 	    createMsgPacket(&datapacket, header, buf, nbytes+1);
 	    createSenderElem(&sendelem, datapacket, seqnum);
 	    addToSenderQueue(sendWin, sendelem);
-	    //printf("Sender Queue Elem seq Num : %d", sendWin->buffer[seqnum].packet.header.seq_num); 
-	    //printf("Sender Queue Elem data : %s", sendWin->buffer[seqnum].packet.payload); 
 	    printf("\nSending Seq # %d", datapacket.header.seq_num);
-	    send(sockfd, &datapacket, sizeof(datapacket), 0);
+	    sendPack = 1;
 	}
+
+	if (sendPack ==  1)
+	{
+	    send(sockfd, &datapacket, sizeof(datapacket), 0);
+	    updateRetransmissionCount(sendWin, datapacket.header.seq_num);
+	}
+
+	msgtype = getMsgType(sendWin, seqnum);
 	printf("\n\tSender Window State : ");
 	printSendingBuffer(sendWin);
-	//printf("\n");
-
-	//	printf("New Seq Number :%d", seqnum);
 
 	if (msgtype == FIN)
 	    break;
-	
+
 	seqnum = seqnum + 1;
 
 	bzero(&buf, PAYLOAD_CHUNK_SIZE);
@@ -256,95 +264,44 @@ ackRcvdresendNewPacketsCongWin:
 
     }
 
-    //    recv(sockfd, &ack, sizeof(ack), 0);
-    /*    if (ack.header.seq_num == sendWin->slidwinstart + 1)
-	  {
-	  resetPresentFlag(sendWin, ack.header.seq_num - 1);
-    //	sendWin->buffer[ack.header.seq_num % sendWin->winsize].isPresent = 0;
-    sendWin->slidwinstart++;
-    }
-    if (ack.header.msg_type == FIN_ACK)
-    return;
-    */
-/*    if (msgtype == FIN)
+    while (1)
     {
-	while (1)
-	{
-	    recv(sockfd, &ack, sizeof(ack), 0);
-
-	    if (sendWin->slidwinstart == ack.header.seq_num)
-		dupAckCount++;
-
-	    if (dupAckCount == 3)
-		setRetransmitFlag(sendWin, ack.header.seq_num);
-
-	    printf("\nAck # %d received. Adv Win : %d", ack.header.seq_num, ack.header.adv_window);
-	    
-	    while (ack.header.seq_num > sendWin->slidwinstart)
-	    {
-		resetPresentFlag(sendWin, sendWin->slidwinstart);
-		resetRetransmitFlag(sendWin, sendWin->slidwinstart);
-//		sendWin->buffer[ack.header.seq_num % sendWin->winsize].isPresent = 0;
-		sendWin->slidwinstart++;
-		prevAck = sendWin->slidwinstart;
-		dupAckCount = 1;
-	    }
-	    printf("\n\tSender Window State : ");
-	    printSendingBuffer(sendWin);
-
-	    if (ack.header.msg_type == FIN_ACK)
-		break;
-	    
-	    if (ack.header.seq_num == sendWin->slidwinstart)
-		goto ackRcvdresendNewPacketsCongWin;
-
-	}
-    }
-    else
-    {
-*/	//printf("\nReceiving Ack #");
 	recv(sockfd, &ack, sizeof(ack), 0);
 
 	if (sendWin->slidwinstart == ack.header.seq_num)
+	{
 	    dupAckCount++;
-
-	//    setRetransmitFlag(sendWin, ack.header.seq_num);
-
-	while (ack.header.seq_num > sendWin->slidwinstart)
-	{
-	    resetPresentFlag(sendWin, sendWin->slidwinstart);
-//	    resetRetransmitFlag(sendWin, sendWin->slidwinstart);
-//	    sendWin->buffer[ack.header.seq_num % sendWin->winsize].isPresent = 0;
-	    sendWin->slidwinstart++;
-	    prevAck = sendWin->slidwinstart;
-	    dupAckCount = 0;
-	    isRetransmit = 0;
-	}
-
-	if (dupAckCount == 3)
-	{
-	    isRetransmit = 1;
-	    sendWin->cwinsize /= 2;
-//	    seqnum = ack.header.seq_num;    //sendWin->slidwinend;
-//	    adwin = ack.header.adv_window;
-//	    goto ackRcvdresendNewPacketsCongWin;
+	    if (dupAckCount == 3)
+	    {
+		isRetransmit = 1;
+		sendWin->cwinsize /= 2;
+		break;
+	    }
 	}
 	else
-	    sendWin->cwinsize += 1;
-	
-	seqnum = ack.header.seq_num;    //sendWin->slidwinend;
-	adwin = ack.header.adv_window;
-	//sendWin->slidwinend += 2;
-	printf("\nAck # %d. Adv. Window # %d .  Please start sending : %d packets from seqnum : %d", ack.header.seq_num, ack.header.adv_window, sendWin->cwinsize, ack.header.seq_num);
-	printf("\n\tSender Window State : ");
-	printSendingBuffer(sendWin);
-/*
-	if (ack.header.msg_type == FIN_ACK)
+	{
+	    while (ack.header.seq_num > sendWin->slidwinstart)
+	    {
+		resetPresentFlag(sendWin, sendWin->slidwinstart);
+		sendWin->slidwinstart++;
+		sendWin->cwinsize += 1;
+	    }
+	    dupAckCount = 0;
+	    isRetransmit = 0;
 	    break;
-*/
-	if (ack.header.msg_type != FIN_ACK)
-	    goto ackRcvdresendNewPacketsCongWin;
-//    }
+	}
+    }
+
+
+    seqnum = ack.header.seq_num;    
+    adwin = ack.header.adv_window;
+
+    printf("\nAck # %d. Adv. Window # %d .  Please start sending : %d packets from seqnum : %d", ack.header.seq_num, ack.header.adv_window, sendWin->cwinsize, ack.header.seq_num);
+    printf("\n\tSender Window State : ");
+    printSendingBuffer(sendWin);
+
+    if (ack.header.msg_type != FIN_ACK)
+	goto ackRcvdresendNewPacketsCongWin;
 
 }
 
@@ -492,15 +449,16 @@ resend_HS2:
     }
 
 
-    if (sigsetjmp(jmpbuf, 1) != 0) {
+    if (sigsetjmp(jmpbuf1, 1) != 0) {
 	if (rtt_timeout(&rttinfo, retransmit_attempt == -1)) {
 	    printf("No response from the client for 2HS after max retransmission attempts. Giving up.\n");
 	    exit(0);
 	}
 	printf("Request timed out. Retransmitting 2HS from both the ports now ...: attempt number: %d\n", retransmit_attempt);
 	goto resend_HS2;
-    }                                                                                                                                                                                                   
-   // alarm(3);
+    }
+    
+    // alarm(3);
     rtt_set_timer(rtt_start(&rttinfo));
 
     /* Recieving 3 Handshake */
@@ -523,7 +481,8 @@ resend_HS2:
     if(header3.msg_type == SYN_ACK_HS3){	
 	printf("\nReceived 3rd Hand Shake Successfully");
     }
-
+    
+    Signal(SIGALRM, alarm_handler2);
     printf("\n Start file transfer Seq number = %d, Initial Advertising window = %d\n", header3.seq_num, header3.adv_window);
     sendFile(sockfd, filename, client_addr, sendWin, header3.seq_num, header3.adv_window);
 
@@ -671,7 +630,7 @@ int main(int argc, char **argv)
 {	
 
     Signal(SIGCHLD, exitChild_handler);
-    Signal(SIGALRM, alarm_handler);
+    Signal(SIGALRM, alarm_handler1);
 
     sendQ sendWin;
     struct servStruct *servInfo = loadServerInfo();
