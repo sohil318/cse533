@@ -44,7 +44,7 @@ static void alarm_handler (int signo)
 void initSenderQueue(sendQ *queue, int winsize, int slidwinstart)	{
     queue->buffer		=   (sendWinElem *) calloc (winsize, sizeof(sendWinElem));
     queue->winsize		=   winsize;
-    queue->cwinsize		=   3;				
+    queue->cwinsize		=   1;				
     queue->slidwinstart		=   slidwinstart;				
     queue->slidwinend		=   -1;  /// slidwinstart + queue->cwinsize;
 }
@@ -117,6 +117,16 @@ void resetPresentFlag(sendQ *sendWin, int i)
 }
 
 /*
+ * Get Message Type in Sending Window element
+ */
+
+int getMsgType(sendQ *queue, int seqnum)
+{
+    return queue->buffer[seqnum % queue->winsize].packet.header.msg_type;
+}
+
+
+/*
  * Minimum of 3 numbers
  */
 
@@ -153,7 +163,7 @@ void printSendingBuffer(sendQ *sendWin)	{
 void sendFile(int sockfd, char filename[PAYLOAD_CHUNK_SIZE], struct sockaddr_in client_addr, sendQ *sendWin, int seqno, int adwin)	{
     char buf[PAYLOAD_CHUNK_SIZE];
     int fp, i, finseq = 65536;
-    int seqnum = seqno, nbytes, advwin = adwin, ts = 0, msgtype, cwindow;
+    int seqnum = seqno, nbytes, advwin = adwin, ts = 0, msgtype, cwindow, isRetransmit = 0;
     int prevAck = -1, dupAckCount = 0;
     hdr header;
     msg datapacket, ack, checkWin, checkWinAck;
@@ -187,7 +197,7 @@ ackRcvdresendNewPacketsCongWin:
     for ( i = 0; i < cwindow && seqnum <= finseq; i++)	{
 
 	/* Check Retransx Flag */
-	if (sendWin->buffer[seqnum % sendWin->winsize].isRetransmit == 1)
+	if (isRetransmit == 1)
 	{
 	    printf("\nRe-Sending Seq # %d", seqnum);
 	    datapacket = sendWin->buffer[seqnum % sendWin->winsize].packet;
@@ -198,7 +208,7 @@ ackRcvdresendNewPacketsCongWin:
 	{	
 	    /* Packet is already in transit */
 	    printf("\nSkipping Packet : %d", seqnum);
-
+	    msgtype = getMsgType(sendWin, seqnum);
 	    //	    sendelem = sendWin->buffer[ seqnum % sendWin->winsize ];
 	    //	    sendelem.retranx++;
 	    //	    datapacket = sendelem.packet;
@@ -256,7 +266,7 @@ ackRcvdresendNewPacketsCongWin:
     if (ack.header.msg_type == FIN_ACK)
     return;
     */
-    if (msgtype == FIN)
+/*    if (msgtype == FIN)
     {
 	while (1)
 	{
@@ -292,35 +302,49 @@ ackRcvdresendNewPacketsCongWin:
     }
     else
     {
-	//printf("\nReceiving Ack #");
+*/	//printf("\nReceiving Ack #");
 	recv(sockfd, &ack, sizeof(ack), 0);
 
 	if (sendWin->slidwinstart == ack.header.seq_num)
 	    dupAckCount++;
 
-	if (dupAckCount == 3)
-	    setRetransmitFlag(sendWin, ack.header.seq_num);
+	//    setRetransmitFlag(sendWin, ack.header.seq_num);
 
 	while (ack.header.seq_num > sendWin->slidwinstart)
 	{
 	    resetPresentFlag(sendWin, sendWin->slidwinstart);
-	    resetRetransmitFlag(sendWin, sendWin->slidwinstart);
+//	    resetRetransmitFlag(sendWin, sendWin->slidwinstart);
 //	    sendWin->buffer[ack.header.seq_num % sendWin->winsize].isPresent = 0;
 	    sendWin->slidwinstart++;
 	    prevAck = sendWin->slidwinstart;
-	    dupAckCount = 1;
+	    dupAckCount = 0;
+	    isRetransmit = 0;
 	}
 
-	sendWin->cwinsize += 1;
+	if (dupAckCount == 3)
+	{
+	    isRetransmit = 1;
+	    sendWin->cwinsize /= 2;
+//	    seqnum = ack.header.seq_num;    //sendWin->slidwinend;
+//	    adwin = ack.header.adv_window;
+//	    goto ackRcvdresendNewPacketsCongWin;
+	}
+	else
+	    sendWin->cwinsize += 1;
+	
 	seqnum = ack.header.seq_num;    //sendWin->slidwinend;
 	adwin = ack.header.adv_window;
 	//sendWin->slidwinend += 2;
 	printf("\nAck # %d. Adv. Window # %d .  Please start sending : %d packets from seqnum : %d", ack.header.seq_num, ack.header.adv_window, sendWin->cwinsize, ack.header.seq_num);
 	printf("\n\tSender Window State : ");
 	printSendingBuffer(sendWin);
-
-	goto ackRcvdresendNewPacketsCongWin;
-    }
+/*
+	if (ack.header.msg_type == FIN_ACK)
+	    break;
+*/
+	if (ack.header.msg_type != FIN_ACK)
+	    goto ackRcvdresendNewPacketsCongWin;
+//    }
 
 }
 

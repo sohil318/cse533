@@ -448,14 +448,14 @@ send_1HS_again:
 	write(sockfd, &pack_1HS, sizeof(pack_1HS));
 	retrans_times++;
 
-    if (sigsetjmp(jmpbuf, 1) != 0) {
-            if (retrans_times > 12) {
-	                printf("No response from the server for 1HS after max retransmission attempts. Giving up.\n");
-			exit(0);
-	   }
-	   printf("Request timed out. Retransmitting 1HS ...");
-	   goto send_1HS_again;
-    }
+	if (sigsetjmp(jmpbuf, 1) != 0) {
+	    if (retrans_times > 12) {
+		printf("No response from the server for 1HS after max retransmission attempts. Giving up.\n");
+		exit(0);
+	    }
+	    printf("Request timed out. Retransmitting 1HS ...");
+	    goto send_1HS_again;
+	}
 
 	alarm(3);
 
@@ -467,7 +467,7 @@ send_1HS_again:
 	    msg *pack_2HS = (msg *)recvBuff;
 	    header2 = pack_2HS->header;
 	    memcpy(newPort, pack_2HS->payload, PAYLOAD_CHUNK_SIZE);
-	}while(header2.msg_type != ACK_HS2);
+	}   while(header2.msg_type != ACK_HS2);
 
 	alarm(0);
 
