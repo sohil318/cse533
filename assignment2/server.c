@@ -1,12 +1,13 @@
 #include	 "utils.h"
 #include	 "server.h"
 #include         <setjmp.h>
-
+#include	 "unprtt.h"
 #define LOOPBACK "127.0.0.1"
 
 /*	Global	declarations	*/
 struct existing_connections *existing_conn;
 static sigjmp_buf jmpbuf;
+static struct rtt_info rttinfo;
 
 /* 
  * Function to check if client and server have same host network. 
@@ -447,10 +448,13 @@ int childRequestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_in
     sprintf(buf, "%d", newport);
     createHeader(&header2, ACK_HS2, 2, 0, 0);
     createMsgPacket(&pack_2HS, header2, buf, sizeof(buf));
+    rtt_init(&rttinfo);   /*To be done just once*/
     int retransmit_attempt = 0;
+    uint32_t timestamp;
 
 resend_HS2:
     sendto(sock, (void *)&pack_2HS, sizeof(pack_2HS), 0, (SA *)&client_addr, sizeof(client_addr));
+    timestamp = rtt_ts(&rttinfo); 
     retransmit_attempt++;
 
     if(retransmit_attempt>1){
@@ -458,15 +462,17 @@ resend_HS2:
 	sendto(sockfd, (void *)&pack_2HS, sizeof(pack_2HS), 0, (SA *)&client_addr, sizeof(client_addr)); 
     }
 
+
     if (sigsetjmp(jmpbuf, 1) != 0) {
-	if (retransmit_attempt > 12) {
+	if (rtt_timeout(&rttinfo, retransmit_attempt == -1)) {
 	    printf("No response from the client for 2HS after max retransmission attempts. Giving up.\n");
 	    exit(0);
 	}
 	printf("Request timed out. Retransmitting 2HS from both the ports now ...: attempt number: %d\n", retransmit_attempt);
 	goto resend_HS2;
     }                                                                                                                                                                                                   
-    alarm(3);
+   // alarm(3);
+    rtt_set_timer(rtt_start(&rttinfo));
 
     /* Recieving 3 Handshake */
     hdr header3;
@@ -478,8 +484,9 @@ resend_HS2:
 	//printf("received msg type num: %d\n", header3.msg_type);
     }while(header3.msg_type != SYN_ACK_HS3);
 
-    alarm(0);
-
+    //alarm(0);
+    rtt_set_timer(0);
+    rtt_stop(&rttinfo, timestamp);
     /* Closing the listening socket after third handshake is recieved*/
     if (close(sock) == -1)
 	err_sys("close error");
