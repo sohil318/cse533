@@ -199,6 +199,52 @@ void createRecvElem (recvWinElem *elem, msg datapacket, int seqnum)	{
     elem->isValid   		=   1;					
 }
 
+int drop_packet ()
+{   
+    double random_val;
+
+    random_val = drand48();
+    if (random_val < clientInfo->dg_lossProb) 
+	return 1;
+    else 
+	return 0;
+}
+
+/*
+ *  Send a packet with droping probability
+ */
+
+int sendPackDrop(int sockfd, void *packet, size_t len, int flags)
+{
+    if (drop_packet())  
+    {
+	printf("Dropping Ack # %d", ((msg *)packet)->header.seq_num);
+	return 0;
+    }
+    else
+    {
+	printf("Sending Ack # %d", ((msg *)packet)->header.seq_num);
+	send(sockfd, packet, len, flags);
+    }
+    return 1;
+}
+
+/*
+ *  Receive  a packet with droping probablity
+ */
+
+int recvPackDrop(int sockfd, void *packet, size_t len, int flags)
+{
+    recv(sockfd, packet, len, flags);
+    if (drop_packet())  
+    {
+	printf("dropped packet %d\n", ((msg *)packet)->header.seq_num);
+	return 0;
+    }
+    else
+	return 1;
+}
+
 /*
  * Add to Receiver Queue
  */
@@ -216,15 +262,20 @@ int addToReceiverQueue(recvQ *queue, recvWinElem elem)	{
 	if (queue->advwinstart == elem.seqnum)
 	{
 	    queue->advwinsize--;
+	    queue->advwinstart++;
 	    if (queue->advwinsize == 0)
 	    {
-		queue->advwinstart++;
+		//queue->advwinstart++;
 		printf("\nReciever Buffer is full. Waiting for consumer thread to read data.");
 		return 1;
 	    }
-	    while (queue->buffer[ ++queue->advwinstart % queue->winsize ].isValid)
+	    while (queue->buffer[ queue->advwinstart % queue->winsize ].isValid && queue->advwinstart != queue->readpacketidx)
 	    {
+		printf("\nAdv Win start = %d, adv win size = %d, element = %d", queue->advwinstart, queue->advwinsize, queue->buffer[queue->advwinstart % queue->winsize].packet.header.seq_num);
+		queue->advwinstart++;
 		queue->advwinsize--;
+		if (queue->advwinsize == 0)
+		    break;
 	    }
 	}
     }
@@ -264,7 +315,12 @@ void recvFile(int sockfd, recvQ *queue, struct sockaddr_in serverInfo, int awin)
 	while (1)
 	{
 	    //printf("Printinf Seq Num\n");
-	    recv(sockfd, &m, sizeof(m), 0);
+	    //recv(sockfd, &m, sizeof(m), 0);
+	    while (recvPackDrop(sockfd, &m, sizeof(m), 0) == 0)
+	    {
+		bzero(&m, sizeof(m));
+	    }
+//		continue;
 	    if (m.header.msg_type == WIN_CHECK) 
 	    {
 		if (queue->advwinsize > 0)	
@@ -279,9 +335,10 @@ void recvFile(int sockfd, recvQ *queue, struct sockaddr_in serverInfo, int awin)
 	    status = addToReceiverQueue(queue, elem);
 	    pthread_mutex_unlock(&lock_mutex);
 
-	    //printf("Printinf Seq Num %d", m.header.seq_num);
-	    //printf("Printinf Payload %s", m.payload);
-	    //printf("%s", m.payload);
+//	    printf("Printinf Seq Num %d", m.header.seq_num);
+//	    printf("Printinf Payload %s", m.payload);
+//	    printf("%s", m.payload);
+	   
 	    printf("Received Packet : %d", m.header.seq_num);
 	    printf("\nReceived Queue State \t"); 
 	    printReceivingBuffer(queue);
@@ -295,7 +352,8 @@ void recvFile(int sockfd, recvQ *queue, struct sockaddr_in serverInfo, int awin)
 		    msgtype = DATA_ACK;
 	    }
 	    createAckPacket(&ack, msgtype, queue->advwinstart, queue->advwinsize, ts);
-	    send(sockfd, &ack, sizeof(ack), 0);
+	    //send(sockfd, &ack, sizeof(ack), 0);
+	    sendPackDrop(sockfd, &ack, sizeof(ack), 0);
 	    
 //	    if (m.header.msg_type == FIN)
 //		break;
@@ -322,7 +380,7 @@ void * consumer_process(void *argQueue){
 		printf("\n------------------------------------Inside consumer thread---------------------------------------\n");
 		pthread_mutex_lock(&lock_mutex); 
 	    
-		while  ((queue->readpacketidx < queue->advwinstart) && (queue->readpacketidx != -1) ) 
+		while  ((queue->buffer[queue->readpacketidx % queue->winsize].isValid) && (queue->readpacketidx != -1) ) 
 		{
 		    //printf("\n Adv Win start %d read packet idx %d\n", queue->advwinstart, queue->readpacketidx);
 		    printf("%s", queue->buffer[queue->readpacketidx % queue->winsize].packet.payload);
