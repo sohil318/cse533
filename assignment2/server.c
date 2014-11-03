@@ -227,11 +227,13 @@ ackRcvdresendNewPacketsCongWin:
 	sendWin->ssthresh   =	sendWin->cwinsize / 2;
 	sendWin->cwinsize   =	1;
 	isRetransmit = 1;
+	addi = 0;
 	if (rtt_timeout(&rttinfo, getRetranxCount(sendWin, seqnum)) == -1) {
-	    printf("No response from the client for packet # %d after 12 retransmission attempts. Giving up.\n", sendWin->slidwinstart);
+	    printf("\nNo response from the client for packet # %d after 12 retransmission attempts. Giving up.\n", sendWin->slidwinstart);
 	    exit(0);
 	}
-	printf("Request timed out. Retransmitting Seq # %d, attempt number: %d\n", sendWin->slidwinstart, getRetranxCount(sendWin, sendWin->slidwinstart));
+	printf("\n ============== REQUEST TIMED OUT !!! Retransmitting Packet Seq # %d, Retransmission attempt number: %d =============\n", sendWin->slidwinstart, getRetranxCount(sendWin, sendWin->slidwinstart));
+	printf("\n ==================================== SLOW-START STARTED !!!. New CWIN : %d, New SS_THRESH %d ===========================\n", seqnum, sendWin->cwinsize, sendWin->ssthresh);
 	goto timeOutReSend;
     }
 
@@ -241,16 +243,21 @@ timeOutReSend:
     
     cwindow = minWin(adwin, sendWin->cwinsize, sendWin->winsize);
     seqnum = sendWin->slidwinstart;
-    printf("\n\nSending from %d packet, cwin  %d number of packets.\n", seqnum, cwindow);
+    printf("\n------------------------------------------------------------------------------------------------------------------------------------");
+    printf("\nSending from Seq # %d, min(CWIN, Advertising Window) : %d , CWIN : %d , Advertising Window : %d, SS_THRESH %d.", seqnum, cwindow, sendWin->cwinsize, adwin, sendWin->ssthresh);
+    printf("\n------------------------------------------------------------------------------------------------------------------------------------\n");
 
     for ( i = 0; i < cwindow && seqnum <= finseq; i++)	{
 
 	if (sendWin->cwinsize >= sendWin->ssthresh)
 	{
 	    if (addi == 0)
+	    {
 		addiseqnum = seqnum + sendWin->ssthresh;
+		printf("\n ============ CWIN threshold reached. ADDITIVE INCREASE started at %d . Next CWIN update @ seqnum %d, Current CWIN %d ============\n", seqnum, addiseqnum, sendWin->cwinsize);
+	    }
 	    addi = 1;
-	    printf("\nADDI starting at %d . Wait for seqnum %d, cwin %d", seqnum, addiseqnum, sendWin->cwinsize);
+//	    printf("\nADDI starting at %d . Wait for seqnum %d, cwin %d", seqnum, addiseqnum, sendWin->cwinsize);
 	}
 	else 
 	{
@@ -261,13 +268,13 @@ timeOutReSend:
 	if (isRetransmit == 1)
 	{
 	    datapacket = sendWin->buffer[seqnum % sendWin->winsize].packet;
-	    printf("\nRe-Sending Seq # %d", datapacket.header.seq_num);
+	    printf("\nRe-Sending Packet Seq # %d", datapacket.header.seq_num);
 	    sendPack = 1;
 	}
 	else if (seqnum <= sendWin->slidwinend || sendWin->buffer[seqnum % sendWin->winsize].isPresent == 1) 
 	{	
 	    /* Packet is already in transit */
-	    printf("\nSkipping Packet : %d", seqnum);
+	    printf("\nSkipping Packet Seq # %d", seqnum);
 	    sendPack = 0;
 	}
 	else
@@ -291,7 +298,7 @@ timeOutReSend:
 	    createMsgPacket(&datapacket, header, buf, nbytes+1);
 	    createSenderElem(&sendelem, datapacket, seqnum);
 	    addToSenderQueue(sendWin, sendelem);
-	    printf("\nSending Seq # %d", datapacket.header.seq_num);
+	    printf("\nSending  Packet Seq # %d", datapacket.header.seq_num);
 	    sendPack = 1;
 	}
 
@@ -302,8 +309,6 @@ timeOutReSend:
 	}
 
 	msgtype = getMsgType(sendWin, seqnum);
-	printf("\n\tSender Window State : ");
-	printSendingBuffer(sendWin);
 
 	setTimeStamp(sendWin, seqnum, timestamp);
 	
@@ -316,6 +321,8 @@ timeOutReSend:
 	bzero(&datapacket, sizeof(datapacket));
 
     }
+    printf("\nSender Window State after all send  : ");
+    printSendingBuffer(sendWin);
 
     while (1)
     {
@@ -329,6 +336,8 @@ timeOutReSend:
 		isRetransmit = 1;
 		sendWin->cwinsize /= 2;
 		sendWin->ssthresh = sendWin->cwinsize;
+		printf("\n ================================================   FAST RETRANSMIT !!!  ========================================================");
+		printf("\n =========================== 3 Duplicate ACK's with ACK packet seq # %d, New CWIN # %d, New Threshold # %d =========================\n", sendWin->slidwinstart, sendWin->cwinsize, sendWin->ssthresh);
 		break;
 	    }
 	}
@@ -362,8 +371,9 @@ timeOutReSend:
     seqnum = ack.header.seq_num;    
     adwin = ack.header.adv_window;
 
-    printf("\nAck # %d. Adv. Window # %d .  Please start sending : %d packets from seqnum : %d, type : %d", ack.header.seq_num, ack.header.adv_window, sendWin->cwinsize, ack.header.seq_num, ack.header.msg_type);
-    printf("\n\tSender Window State : ");
+    printf("\nAck Received # %d. Advertising Window : %d.", ack.header.seq_num, ack.header.adv_window);
+    //printf("\nAck Received # %d. Adv. Window # %d .  Please start sending : %d packets from seqnum : %d, type : %d", ack.header.seq_num, ack.header.adv_window, sendWin->cwinsize, ack.header.seq_num, ack.header.msg_type);
+    printf("\nSender Window State on Ack received : ");
     printSendingBuffer(sendWin);
 
     if (ack.header.msg_type != FIN_ACK)
@@ -452,13 +462,15 @@ int childRequestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_in
 		err_sys("\nsocket creation error\n");
 
 	    if(isLocal)
+	    {
+		printf("\nClient IP Address is local.\n");
 		if (setsockopt(sockfd, SOL_SOCKET, SO_DONTROUTE, &optval, sizeof(optval)) < 0)
 		{
 		    printf("\nerror : socket option error.\n");
 		    close(sockfd);
 		    exit(2);
-		}
-
+	    	}
+	    }
 	    /* binding to the serv ip */
 	    bzero(&servaddr, sizeof(servaddr));
 	    servaddr.sin_family     	 = AF_INET;
@@ -475,7 +487,7 @@ int childRequestHandler(int sock, struct InterfaceInfo *head, struct sockaddr_in
 	    getsockname(sockfd, (struct sockaddr *)&addr, &len);
 	    inet_ntop(AF_INET, &addr.sin_addr, src, sizeof(src)); 
 	    newport = addr.sin_port;
-	    printf("\n\nClient : IP Address = %s \t Port No : %d ", src, ntohs(addr.sin_port)); 
+	    printf("\nClient : IP Address = %s \t New Ephemeral Port No : %d ", src, ntohs(addr.sin_port)); 
 
 
 	    /* connect to client ip */
@@ -549,11 +561,12 @@ resend_HS2:
 	err_sys("close error");
 
     if(header3.msg_type == SYN_ACK_HS3){	
-	printf("\nReceived 3rd Hand Shake Successfully");
+	printf("\nHandshake 3 recieved from client.\n");
+	//printf("\nReceived 3rd Hand Shake Successfully");
     }
     
     Signal(SIGALRM, alarm_handler2);
-    printf("\n Start file transfer Seq number = %d, Initial Advertising window = %d\n", header3.seq_num, header3.adv_window);
+    printf("\nStart file transfer Seq number = %d, Initial Advertising window = %d\n", header3.seq_num, header3.adv_window);
     sendFile(sockfd, filename, client_addr, sendWin, header3.seq_num, header3.adv_window);
 
 }
@@ -668,15 +681,14 @@ void listenInterfaces(struct servStruct *servInfo, sendQ *sendWin)
 		//				printf("\nClient Address  %s & port number %d ", src, clientInfo.sin_port);
 		hdr header1 = packet_1HS.header;
 		if(header1.msg_type == SYN_HS1)	{
-		    printf("\n1 Handshake recieved from client \n");
+		    printf("\nHandshake 1 recieved from client. \n");
 		}
 		if( existing_connection(&clientInfo) == 1 ) { 
 		    printf("Duplicate connection request!");
 		}
 		else {
 		    if ((pid = fork()) == 0)    {
-			printf("Filename requested for transfer by the client: %s \n", packet_1HS.payload);
-			//                                              printf("\nClient Request Handler forked .");
+			printf("File to be send to client: %s \n", packet_1HS.payload);
 			childRequestHandler(head->sockfd, interfaceList, clientInfo, packet_1HS.payload, sendWin);
 			exit(0);
 		    }

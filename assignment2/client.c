@@ -154,7 +154,7 @@ int createInitialConn(struct clientStruct **cliInfo, int isLocal)
         bzero(&addr, sizeof(struct sockaddr_in));  
         getsockname(sockfd, (struct sockaddr *)&addr, &len);
 	inet_ntop(AF_INET, &addr.sin_addr, src, sizeof(src)); 
-        printf("\nClient IP Address = %s \t Port No : %d\n ", src, ntohs(addr.sin_port)); 
+        printf("\nClient : IP Address = %s \t Port No : %d ", src, ntohs(addr.sin_port)); 
         temp->cli_portNum = ntohs(addr.sin_port);
 
         /* Connect socket to Server IP */
@@ -169,7 +169,7 @@ int createInitialConn(struct clientStruct **cliInfo, int isLocal)
         bzero(&addr, sizeof(struct sockaddr_in));  
         getpeername(sockfd, (struct sockaddr *)&addr, &len);
 	inet_ntop(AF_INET, &addr.sin_addr, src, sizeof(src)); 
-	printf("\nServer IP Address = %s \t Port No : %d\n ", src, ntohs(addr.sin_port)); 
+	printf("\nServer : IP Address = %s \t Listening Port No : %d\n ", src, ntohs(addr.sin_port)); 
         
         cliInfo = &temp;
         return sockfd;
@@ -219,12 +219,12 @@ int sendPackDrop(int sockfd, void *packet, size_t len, int flags)
 {
     if (drop_packet())  
     {
-	printf("Dropping Ack # %d", ((msg *)packet)->header.seq_num);
+	printf("\nDropping Ack # %d", ((msg *)packet)->header.seq_num);
 	return 0;
     }
     else
     {
-	printf("Sending Ack # %d", ((msg *)packet)->header.seq_num);
+	printf("\nSending Ack # %d", ((msg *)packet)->header.seq_num);
 	send(sockfd, packet, len, flags);
     }
     return 1;
@@ -239,7 +239,7 @@ int recvPackDrop(int sockfd, void *packet, size_t len, int flags)
     recv(sockfd, packet, len, flags);
     if (drop_packet())  
     {
-	printf("dropped packet %d\n", ((msg *)packet)->header.seq_num);
+	printf("\nDropped Incoming Packet Seq Number %d", ((msg *)packet)->header.seq_num);
 	return 0;
     }
     else
@@ -267,12 +267,12 @@ int addToReceiverQueue(recvQ *queue, recvWinElem elem)	{
 	    if (queue->advwinsize == 0)
 	    {
 		//queue->advwinstart++;
-		printf("\nReciever Buffer is full. Waiting for consumer thread to read data.");
+		printf("\n ================================= Reciever Buffer is full. Waiting for consumer thread to read data. ==================================");
 		return 1;
 	    }
 	    while (queue->buffer[ queue->advwinstart % queue->winsize ].isValid && queue->advwinstart != queue->readpacketidx)
 	    {
-		printf("\nAdv Win start = %d, adv win size = %d, element = %d", queue->advwinstart, queue->advwinsize, queue->buffer[queue->advwinstart % queue->winsize].packet.header.seq_num);
+		//printf("\nAdv Win start = %d, adv win size = %d, element = %d", queue->advwinstart, queue->advwinsize, queue->buffer[queue->advwinstart % queue->winsize].packet.header.seq_num);
 		queue->advwinstart++;
 		queue->advwinsize--;
 		if (queue->advwinsize == 0)
@@ -299,8 +299,6 @@ void printReceivingBuffer(recvQ *recvWin)	{
 	else
 	    printf("    XXXX");
     }	
-	    printf("\n");
-
 }
 
 /* 
@@ -316,8 +314,7 @@ void recvFile(int sockfd, recvQ *queue, struct sockaddr_in serverInfo, int awin)
 	printf("\nData Received on Client : \n");
 	while (1)
 	{
-	    //printf("Printinf Seq Num\n");
-	    //recv(sockfd, &m, sizeof(m), 0);
+	    printf("\n\n");
 	    while (recvPackDrop(sockfd, &m, sizeof(m), 0) == 0)
 	    {
 		bzero(&m, sizeof(m));
@@ -334,6 +331,8 @@ void recvFile(int sockfd, recvQ *queue, struct sockaddr_in serverInfo, int awin)
 	    }
 	    if (m.header.seq_num < queue->advwinstart)
 	    {
+		if (m.header.seq_num == 0)
+		    continue;
 		printf("\nOld Packet Re received. Thrashed. %d\n", m.header.seq_num);
 		//continue;
 	    }
@@ -348,17 +347,17 @@ void recvFile(int sockfd, recvQ *queue, struct sockaddr_in serverInfo, int awin)
 //	    printf("Printinf Payload %s", m.payload);
 //	    printf("%s", m.payload);
 	   
-	    printf("Received Packet : %d, type : %d", m.header.seq_num, m.header.msg_type);
+	    //printf("Received Packet : %d, type : %d", m.header.seq_num, m.header.msg_type);
 	    if (m.header.msg_type == FIN)
 		finseq = m.header.seq_num;
-	    printf("\nReceived Queue State \t"); 
+	    
+	    printf("\nReceiver Queue State \t"); 
 	    printReceivingBuffer(queue);
-	    printf("\n");
 
 	    if (queue->advwinstart == finseq + 1)   {
 		    msgtype = FIN_ACK;
 		    fin_recieved = 1;
-		    printf("\n---------------------------Fin recieved in producer--------------------------\n");
+	    	    //printf("\n---------------------------Fin recieved in producer--------------------------\n");
 	    }    
 	    else {
 		    msgtype = DATA_ACK;
@@ -369,8 +368,6 @@ void recvFile(int sockfd, recvQ *queue, struct sockaddr_in serverInfo, int awin)
 	    //send(sockfd, &ack, sizeof(ack), 0);
 	    sendPackDrop(sockfd, &ack, sizeof(ack), 0);
 	    
-//	    if (m.header.msg_type == FIN)
-//		break;
 	}
 }
 
@@ -391,7 +388,7 @@ void * consumer_process(void *argQueue){
 	    }
 	    else
 	    {
-		printf("\n------------------------------------Inside consumer thread---------------------------------------\n");
+		printf("\n====================================================== Consumer Reading to STDOUT !!! ========================================================\n\n");
 		pthread_mutex_lock(&lock_mutex); 
 	    
 		while  ((queue->buffer[queue->readpacketidx % queue->winsize].isValid) && (queue->readpacketidx != -1) ) 
@@ -407,7 +404,7 @@ void * consumer_process(void *argQueue){
 		    queue->advwinsize++;
 		}
 	    
-		printf("\n New Adv Window Size after consumer thread has read : %d, window start : %d", queue->advwinsize, queue->advwinstart);
+		printf("\n\nNew Adv Window Size after consumer thread has read : %d, window start : %d\n", queue->advwinsize, queue->advwinstart);
 	
 		pthread_mutex_unlock(&lock_mutex); 
 		if (fin_recieved == 1)
@@ -416,13 +413,13 @@ void * consumer_process(void *argQueue){
 //		    if (ack_ack.header.msg_type == FIN_ACK_ACK)
 			break;
 		}
-		printf("\n---------------------------------Consumer thread going to sleep.------------------------------------\n\n");
+		printf("\n====================================================== PRODUCER Reading again !!! ===========================================================\n");
 	    }
 	    usleep(sleep_duration()*1000);
 	}
     	if (fin_recieved == 1)
     	{
-		printf("\n---------------------------Fin recieved. Consumer thread terminating and exiting---------------------\n");
+		printf("\n===================================================== FILE TRANSFER COMPLETED !!! ===========================================================\n");
 		exit(0);
     	}
 
@@ -432,9 +429,10 @@ int main(int argc, char **argv)
 {	
 	clientInfo        =       loadClientInfo();
         int isLocal, sockfd, advwin = 0, ts = 0;
+	int len;
 	char src[128];
 	char recvBuff[1024];	
-	struct sockaddr_in servIP;	
+	struct sockaddr_in servIP, addr;	
 	int retrans_times = 0;
 
 	srand48(clientInfo->seed);
@@ -493,7 +491,7 @@ send_1HS_again:
 	alarm(0);
 
 	if(header2.msg_type == ACK_HS2){
-	    printf(" 2 HS recvd : New port number recieved from Server : %d \n", ntohs(atoi(newPort)));
+	    printf("\nHandshake 2 recieved from client. New port number recieved from Server : %d \n", ntohs(atoi(newPort)));
 	}
 	clientInfo->serv_portNum = htons(atoi(newPort));
 
@@ -504,6 +502,10 @@ send_1HS_again:
         servIP.sin_addr   =   clientInfo->serv_addr.sin_addr;
 	if (connect(sockfd, (SA *) &servIP, sizeof(servIP)) < 0)
                 err_sys("\nconnect error\n");
+	
+        getpeername(sockfd, (struct sockaddr *)&addr, &len);
+	inet_ntop(AF_INET, &addr.sin_addr, src, sizeof(src)); 
+	printf("\nServer : IP Address = %s \t New Connected Port No : %d\n ", src, ntohs(addr.sin_port)); 
 
 	/* Sending the 3-hand shake */
 	//sleep(4);
