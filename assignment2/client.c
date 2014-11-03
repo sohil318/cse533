@@ -330,20 +330,28 @@ void recvFile(int sockfd, recvQ *queue, struct sockaddr_in serverInfo, int awin)
 		    continue;
 		}
 	    }
-	    createRecvElem (&elem, m, m.header.seq_num);
-	    pthread_mutex_lock(&lock_mutex);  
-	    status = addToReceiverQueue(queue, elem);
-	    pthread_mutex_unlock(&lock_mutex);
-
+	    if (m.header.seq_num < queue->advwinstart)
+	    {
+		printf("\nOld Packet Re received. Thrashed. %d\n", m.header.seq_num);
+		//continue;
+	    }
+	    else
+	    {
+		createRecvElem (&elem, m, m.header.seq_num);
+		pthread_mutex_lock(&lock_mutex);  
+		status = addToReceiverQueue(queue, elem);
+		pthread_mutex_unlock(&lock_mutex);
+	    }
 //	    printf("Printinf Seq Num %d", m.header.seq_num);
 //	    printf("Printinf Payload %s", m.payload);
 //	    printf("%s", m.payload);
 	   
-	    printf("Received Packet : %d", m.header.seq_num);
+	    printf("Received Packet : %d, type : %d", m.header.seq_num, m.header.msg_type);
 	    printf("\nReceived Queue State \t"); 
 	    printReceivingBuffer(queue);
 	    printf("\n");
-	    if (m.header.msg_type == FIN){
+
+	    if (queue->buffer[queue->advwinstart-1 % queue->winsize].packet.header.msg_type == FIN){
 		    msgtype = FIN_ACK;
 		    fin_recieved = 1;
 		    printf("\n---------------------------Fin recieved in producer--------------------------\n");
@@ -351,6 +359,8 @@ void recvFile(int sockfd, recvQ *queue, struct sockaddr_in serverInfo, int awin)
 	    else {
 		    msgtype = DATA_ACK;
 	    }
+
+
 	    createAckPacket(&ack, msgtype, queue->advwinstart, queue->advwinsize, ts);
 	    //send(sockfd, &ack, sizeof(ack), 0);
 	    sendPackDrop(sockfd, &ack, sizeof(ack), 0);
@@ -384,12 +394,16 @@ void * consumer_process(void *argQueue){
 		{
 		    //printf("\n Adv Win start %d read packet idx %d\n", queue->advwinstart, queue->readpacketidx);
 		    printf("%s", queue->buffer[queue->readpacketidx % queue->winsize].packet.payload);
+		    if(queue->buffer[queue->readpacketidx % queue->winsize].packet.header.msg_type == FIN)
+		    {
+			fin_recieved = 1;
+		    }
 		    queue->buffer[queue->readpacketidx % queue->winsize].isValid = 0;
 		    queue->readpacketidx++;
 		    queue->advwinsize++;
 		}
 	    
-		printf("\n New Adv Window Size after consumer thread has read : %d", queue->advwinsize);
+		printf("\n New Adv Window Size after consumer thread has read : %d, window start : %d", queue->advwinsize, queue->advwinstart);
 	
 		pthread_mutex_unlock(&lock_mutex); 
 		if (fin_recieved == 1)
