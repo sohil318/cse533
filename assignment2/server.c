@@ -615,8 +615,8 @@ static void exitChild_handler (int signo)
     struct existing_connections *next = existing_conn;	
 
     while ((pid = waitpid(-1, &l, WNOHANG)) > 0) {
-	printf("\n Child %d terminated (%d)\n", 
-		(int)pid, l);
+	printf("\n Child process with pid # %d terminated successfully after file transfer. Connection Details Removed from List.\n", 
+		(int)pid);
     }
 
     /* Delete the entry from existing connection list*/

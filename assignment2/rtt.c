@@ -1,7 +1,7 @@
 /* include rtt1 */
 #include	"unprtt.h"
 
-int rtt_d_flag = 0;		/* debug flag; can be set by caller */
+int rtt_d_flag = 1;		/* debug flag; can be set by caller */
 
 /*
  * Calculate the RTO value based on current estimators:
@@ -43,6 +43,8 @@ rtt_init(struct rtt_info *ptr)
 	ptr->rtt_srtt   = 0;
 	ptr->rtt_rttvar = 3000;		    
 	ptr->rtt_rto = rtt_minmax(RTT_RTOCALC(ptr));
+	rtt_debug(ptr);
+
 		/* first RTO at (srtt + (4 * rttvar)) = 3000 milliseconds */
 }
 /* end rtt1 */
@@ -121,24 +123,26 @@ rtt_stop(struct rtt_info *ptr, uint32_t ms)
 {
 	uint32_t delta;
 
-	ptr->rtt_rtt = ms;		/* measured rtt in milli seconds */
+	ptr->rtt_rtt = rtt_ts(ptr) - ms;		/* measured rtt in milli seconds */
 
 	/*
 	 * update our estimators of rtt and mean deviation of rtt.
 	 * see jacobson's sigcomm '88 paper, appendix a, for the details.
 	 * we use floating point here for simplicity.
 	*/
-	ptr->rtt_rtt -= ptr->rtt_srtt << 3;
-	ptr->rtt_srtt += ptr->rtt_rtt;		/* g = 1/8 */
+	delta = ptr->rtt_rtt - ptr->rtt_srtt >> 3;
+	ptr->rtt_srtt += delta;		/* g = 1/8 */
 
-	if (ptr->rtt_rtt < 0)
-		ptr->rtt_rtt = -ptr->rtt_rtt;				/* |delta| */
+	if (delta < 0)
+		delta = -delta;				/* |delta| */
 	
-	ptr->rtt_rtt -= ptr->rtt_rttvar >> 2;
+	delta -= ptr->rtt_rttvar >> 2;
 	
-	ptr->rtt_rttvar += ptr->rtt_rtt;	/* h = 1/4 */
+	ptr->rtt_rttvar += delta;	/* h = 1/4 */
 
 	ptr->rtt_rto = rtt_minmax(RTT_RTOCALC(ptr));
+	rtt_debug(ptr);
+
 }
 
 /*
@@ -153,7 +157,7 @@ rtt_timeout(struct rtt_info *ptr, int retransmit)
 	ptr->rtt_rto = ptr->rtt_rto<< 1;		/* next RTO */
       //  printf("%d", ptr->rtt_nrexmt);	
 	ptr->rtt_rto = rtt_minmax(ptr->rtt_rto);
-	
+	rtt_debug(ptr);
 	if (retransmit > RTT_MAXNREXMT)
 		return(-1);			/* time to give up for this packet */
 	return(0);
