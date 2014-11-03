@@ -57,6 +57,7 @@ void initSenderQueue(sendQ *queue, int winsize, int slidwinstart)	{
     queue->cwinsize		=   1;				
     queue->slidwinstart		=   slidwinstart;				
     queue->slidwinend		=   -1;  /// slidwinstart + queue->cwinsize;
+    queue->ssthresh		=   winsize;
 }
 
 /*
@@ -193,10 +194,10 @@ void sendFile(int sockfd, char filename[PAYLOAD_CHUNK_SIZE], struct sockaddr_in 
     char buf[PAYLOAD_CHUNK_SIZE];
     int fp, i, finseq = 65536;
     int seqnum = seqno, nbytes, advwin = adwin, ts = 0, msgtype, cwindow, isRetransmit = 0;
-    int prevAck = -1, dupAckCount = 0, sendPack = 0;
+    int prevAck = -1, dupAckCount = 0, sendPack = 0, addi = 0, addiseqnum = -1;
     uint32_t timestamp;
     hdr header;
-    msg datapacket, ack, checkWin, checkWinAck;
+    msg datapacket, ack_ack, ack, checkWin, checkWinAck;
     sendWinElem sendelem;
 
     fp = open(filename, O_RDONLY, S_IREAD);
@@ -223,7 +224,8 @@ ackRcvdresendNewPacketsCongWin:
     
     if (sigsetjmp(jmpbuf2, 1) != 0) {
 	/* Update SS_THRESH */	
-	sendWin->cwinsize = 1;
+	sendWin->ssthresh   =	sendWin->cwinsize / 2;
+	sendWin->cwinsize   =	1;
 	isRetransmit = 1;
 	if (rtt_timeout(&rttinfo, getRetranxCount(sendWin, seqnum)) == -1) {
 	    printf("No response from the client for packet # %d after 12 retransmission attempts. Giving up.\n", sendWin->slidwinstart);
@@ -239,9 +241,21 @@ timeOutReSend:
     
     cwindow = minWin(adwin, sendWin->cwinsize, sendWin->winsize);
     seqnum = sendWin->slidwinstart;
-    printf("\n\nSending from %d packet,  %d number of packets.\n", seqnum, cwindow);
+    printf("\n\nSending from %d packet, cwin  %d number of packets.\n", seqnum, cwindow);
 
     for ( i = 0; i < cwindow && seqnum <= finseq; i++)	{
+
+	if (sendWin->cwinsize >= sendWin->ssthresh)
+	{
+	    if (addi == 0)
+		addiseqnum = seqnum + sendWin->ssthresh;
+	    addi = 1;
+	    printf("\nADDI starting at %d . Wait for seqnum %d, cwin %d", seqnum, addiseqnum, sendWin->cwinsize);
+	}
+	else 
+	{
+	    addi = 0;
+	}
 
 	/* Check Retransx Flag */
 	if (isRetransmit == 1)
@@ -314,6 +328,7 @@ timeOutReSend:
 	    {
 		isRetransmit = 1;
 		sendWin->cwinsize /= 2;
+		sendWin->ssthresh = sendWin->cwinsize;
 		break;
 	    }
 	}
@@ -323,13 +338,22 @@ timeOutReSend:
 	    {
 		resetPresentFlag(sendWin, sendWin->slidwinstart);
 		sendWin->slidwinstart++;
-		sendWin->cwinsize += 1;
+		if (addi != 1)
+		    sendWin->cwinsize += 1;
 	    }
+	    if (addi)
+	    {
+		if (ack.header.seq_num >= addiseqnum)
+		{
+		    sendWin->cwinsize += 1;
+		    addiseqnum = ack.header.seq_num + sendWin->cwinsize;
+		}
+	    }
+	    
 	    dupAckCount = 0;
 	    isRetransmit = 0;
 	    rtt_set_timer(0);
 	    rtt_stop(&rttinfo, timestamp);
-	    
 	    break;
 	}
     }
@@ -338,12 +362,16 @@ timeOutReSend:
     seqnum = ack.header.seq_num;    
     adwin = ack.header.adv_window;
 
-    printf("\nAck # %d. Adv. Window # %d .  Please start sending : %d packets from seqnum : %d", ack.header.seq_num, ack.header.adv_window, sendWin->cwinsize, ack.header.seq_num);
+    printf("\nAck # %d. Adv. Window # %d .  Please start sending : %d packets from seqnum : %d, type : %d", ack.header.seq_num, ack.header.adv_window, sendWin->cwinsize, ack.header.seq_num, ack.header.msg_type);
     printf("\n\tSender Window State : ");
     printSendingBuffer(sendWin);
 
     if (ack.header.msg_type != FIN_ACK)
 	goto ackRcvdresendNewPacketsCongWin;
+    
+    
+    createAckPacket(&ack_ack, FIN_ACK_ACK, 0, 0, 0);
+    send(sockfd, &ack_ack, sizeof(ack_ack), 0);
 
 }
 

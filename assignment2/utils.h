@@ -16,6 +16,7 @@
 
 #define FIN		    13
 #define FIN_ACK		    14
+#define FIN_ACK_ACK	    15
 
 #define PAYLOAD_CHUNK_SIZE  512
 #define PACKET_SIZE	    528

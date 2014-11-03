@@ -21,6 +21,7 @@ typedef struct SenderQueue	{
 	int		cwinsize;				/*  Sliding Window Size			*/
 	int		slidwinstart;				/*  Sliding Window Start		*/
 	int		slidwinend;				/*  Oldest Packet sent to output	*/
+	int		ssthresh;
 } sendQ;
 
 #endif	/* __server_h */

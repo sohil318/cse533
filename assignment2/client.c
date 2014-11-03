@@ -14,7 +14,8 @@ static sigjmp_buf jmpbuf;
 pthread_t producer_thread;
 pthread_t consumer_thread;
 static pthread_mutex_t lock_mutex;
-static int fin_recieved; 
+static int fin_recieved, fsockfd; 
+static msg ack_ack;
 static clientStruct *clientInfo;
 
 int getSubnetCount(unsigned long netmsk)
@@ -310,7 +311,8 @@ void recvFile(int sockfd, recvQ *queue, struct sockaddr_in serverInfo, int awin)
 {
 	msg m, ack, updateWin;
 	recvWinElem elem;
-	int msgtype, advwin = awin, ts = 0, status;
+	fsockfd = sockfd;
+	int msgtype, advwin = awin, ts = 0, status, finseq = -1;
 	printf("\nData Received on Client : \n");
 	while (1)
 	{
@@ -347,11 +349,13 @@ void recvFile(int sockfd, recvQ *queue, struct sockaddr_in serverInfo, int awin)
 //	    printf("%s", m.payload);
 	   
 	    printf("Received Packet : %d, type : %d", m.header.seq_num, m.header.msg_type);
+	    if (m.header.msg_type == FIN)
+		finseq = m.header.seq_num;
 	    printf("\nReceived Queue State \t"); 
 	    printReceivingBuffer(queue);
 	    printf("\n");
 
-	    if (queue->buffer[queue->advwinstart-1 % queue->winsize].packet.header.msg_type == FIN){
+	    if (queue->advwinstart == finseq + 1)   {
 		    msgtype = FIN_ACK;
 		    fin_recieved = 1;
 		    printf("\n---------------------------Fin recieved in producer--------------------------\n");
@@ -407,8 +411,11 @@ void * consumer_process(void *argQueue){
 	
 		pthread_mutex_unlock(&lock_mutex); 
 		if (fin_recieved == 1)
-		    break;
-	    
+		{
+//		    recv(fsockfd, &ack_ack, sizeof(ack_ack), 0);
+//		    if (ack_ack.header.msg_type == FIN_ACK_ACK)
+			break;
+		}
 		printf("\n---------------------------------Consumer thread going to sleep.------------------------------------\n\n");
 	    }
 	    usleep(sleep_duration()*1000);
