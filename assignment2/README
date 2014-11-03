@@ -1,42 +1,143 @@
+README FOR ASSIGNMENT-2 (CSE-533)
+    ---------------------------------
 
-  This directory contains the modified code that permits us to pick up the
-  network masks using the ioctl version of get_ifi_info (Chapter 17).
-
-  Modifications have been introduced to the following files
-  (w.r.t. ~cse533/Stevens/unpv13e):
-
-  1. lib/get_ifi_info.c        here named      get_ifi_info_plus.c
-  2. lib/unpifi.h              here named      unpifiplus.h
-  3. ioctl/prifinfo.c          here named      prifinfo_plus.c
+    GROUP MEMBERS:
+    . Sohil Gandhi (sogandhi)   109395892
+    . Shipra Gupta (shipgupta)  109348052
 
 
-  Modifications in file get_ifi_info_plus.c:
-  ------------------------------------------
+    ASSIGNMENT TASK: We had to implement a primitive file transfer protocol for Unix platforms, based on UDP, and with TCP-like reliability added to the transfer operation using timeouts and sliding-window mechanisms, and implementing flow and congestion control.
 
-  function  get_ifi_info   renamed  get_ifi_info_plus
-                (plus, slight modification in the code)
+    Below, we have explained some of the details about our design and implementation in this assignment:
 
-  function  Get_ifi_info   renamed  Get_ifi_info_plus
-                (but no modification in the code itself,
-                 except for having it call get_ifi_info_plus
-                 instead of get_ifi_info)
+    -------------------------------------------------------------------------------------------------------------------------------------------------
 
-  function  free_ifi_info  renamed  free_ifi_info_plus
-                (plus, slight modification in the code)
+    - LINKED_LIST OF STRUCTURES FOR SOCKETS:
+    We created a structure called InterfaceInfo to store the information of each socket on client as well as server. The structure is defined as follows:
+
+    /* struct for an Interface */
+    typedef struct InterfaceInfo {
+	int                     sockfd;                 /* socket file descriptor       */
+	int                     mask;                   /* Subnet mask bits             */
+	struct sockaddr_in      ifi_addr;               /* primary address              */
+	struct sockaddr_in      ifi_ntmaddr;            /* netmask address              */
+	struct sockaddr_in      ifi_subnetaddr;         /* subnet address               */
+	struct InterfaceInfo	*ifi_next;              /* next of these structures     */
+    }interfaceInfo;
+
+We created a Linked List of these InterfaceInfo structures to use them for processing later throughout the programs.
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
+- BINDING UNICAST ADDRESSES:
+The get_ifi_info() method gets all the addressess associated with an interface in an ifi_info struct, by issuing an ioctl. The addresses are:
+. primary unicast address (ifi_addr)
+    . broadcast address (ifi_brdaddr),
+    . destination address (ifi_dstaddr).
+    We bound only the ifi_addr to the sockets.
+
+    -------------------------------------------------------------------------------------------------------------------------------------------------
+
+    - MODIFICATIONS MADE IN RTT LIBRARY FUNCTIONS:
+
+    We have made changes in unprtt.h and rtt.c files. We have provided the changed copies in our submission.
+
+    . RTT values are stored as int instead of floats. This led us to make changes in the struct rtt_info, where we have changed all the floats to ints.
+
+    . Since the RTT in compserves are in millisecond range, we modified the functions rtt_init(), rtt_ts(), rtt_start() and rtt_stop() to measure time in milliseconds instead of seconds.
+
+    . We have modified the values of RTT_RXTMIN, RTT_RXTMAX, RTT_MAXNREXMT in unprtt.c, increasing the maximum number of retransmits from 3 to 12, and changing the min and maz time to 1 and 3 sec resp.
+
+    -------------------------------------------------------------------------------------------------------------------------------------------------
+
+    - THREE-WAY HANDSHAKES AND TIMOUT MECHANISMS:
+
+    . Initially, the client sends a datagram to the server, which contains the filename that it is requesting to be transfered from the server. This is the first hand-shake. In case this is lost and does not reach the server, we have used a timout mechanism, where we wait for the second handshake from the server for 3 seconds and then retransmit the first datagram. This is done for a maximum of 12 attempts after which the client gives up.
+    Also, we have maintained a linked list of the existing connections to avoid mistakes in case we receive duplicate connection requests. Hence before connecting to any client, we have checked the linked list of existing connection, and if it does not exist, we connect and add the new details to the existing connection linked-list.
+    . Similarly, in the second handshake, the server(child) sends a datagram containing the new port number of its connection socket for the client to reconnect to it. This is also backed by a timout mechanism. The server waits for third handshake, till it times out and retransmits the second handshake until it either succeeds or exceeds max retransmit attempts.
+    . The data to be transferred starts from sequence number 3. After the third handshake, the ack is sent with seq num 3.
+
+    -------------------------------------------------------------------------------------------------------------------------------------------------
+
+    - FORMAT OF THE MESSAGE AND HEADER BEING EXCHANGED BETWEEN THE CLIENT AND SERVER
+
+    The message packet that we are exchanging between the sender and reciever is of the type struct msg, which looks like the following:
+
+    typedef struct message  {
+	hdr     header;                                 /* Structure to store header information    */
+	char    payload[PAYLOAD_CHUNK_SIZE];            /* Actual Data bytes to be sent             */
+	int     len;                                    /* Size of payload being sent               */
+    }msg;
 
 
-  Modifications in file unpifiplus.h:
-  -----------------------------------
+The hdr (header) contains : message type, sequence number, advertising window size and timestamp of a packet. This is depicted clearly in the fig. below:
 
-  extra field introduced in structure ifi_info for sockaddr structure
-  that holds network mask
++------------------+   <--------]
+|     MSG_TYPE     |            H
+|------------------|            E
+|     SEQ_NUM      |            A
+|------------------|            D
+|    ADV_WINDOW    |            E
+|------------------|            R
+|     TIMESTAMP    |            |
++------------------+   <--------]
+|                  |            |
+|      PAYLOAD     |        512 Bytes
+|                  |            |
+.------------------.   <--------]
+|      LEN         |
++------------------+
+
+msg_type can be one of the following type of messages:
+
+SYN_HS1             1
+ACK_HS2             2
+SYN_ACK_HS3         3
+WIN_CHECK           4
+WIN_UPDATE          5
+DATA_PAYLOAD        11
+DATA_ACK            12
+FIN                 13
+FIN_ACK             14
+FIN_ACK_ACK         15
+PAYLOAD_CHUNK_SIZE  512
+PACKET_SIZE         528
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
+- FLOW CONTROL
+
+The sender and the receiver window size is picked up from the input files to server and client.
+The maximum size that the congestion window can attain is dependend on this value. This also represents the maximum number of packets that can be buffered on the client side.
+The sender window is an array of window size with each sequence number holding the position (index) seqnum % winsize. The cwinsize determines the size of congestion window . The slidwinstart and end determines the start and end of congestion window.
+The receiver window is an array of client window size with each sequence number holding the position (index) seqnum % winsize. The advertising window size determines the capacity of the receiver . The advwinstart and advwinend determines the start and end of advertising window.
+Sending of packets is determined by min of congestion window, advertising window and receiver buffer size.
+
+- CONGESTION CONTROL, SLOW START, FAST RECOVERY
+
+There are two conditions when the congestion window will decrease.
+. In the case of a timeout, the congestion window drops to 1, and the slow start threshold is set to half of the congestion window's previous value.
+. In the case of three duplicate acks, we do a fast retransmit, where the congestion window and slow start threshold, both drop to half the current value of congestion window.
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
+- WINDOW PROBES IF THE RECEIVER WINDOW BECOMES FULL:
+
+.To take care of the potential deadlock when the reciever window locks (happens if the consumer thread sleeps for a long duration, hence contents are not read from the recieving window for a long time), we have implemented a mechanism, where once the server recieves an ack with adv window size 0, it enters a persist timer which times out every 1 second and sends a window probe to the client, forcing client to send an ack with updated adv window. Once the ack is recieved with an updated non-zero advertising window size, the server comes out of it and resumes sending further data packets.
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
+- GRACEFUL AND CLEAN TERMINATION AFTER COMPLETION OF FILE TRANSFER:
+
+In order to ensure a clean closing and avoid server process hanging for the last ACK (called FIN_ACK in our program) from the client, once it sends a FIN to the it, we have used a three-way handshake mechanism.
+Once the server sends a FIN to the client, the client will send a FIN_ACK to the server. (Note that both of these will be backed by timout, hence the server will keep retransmitting the FIN until a FIN_ACK is recieved.) Now to ensure that the client does not exit until this happens, we make the client wait for a FIN_ACK_ACK message from the server and then exit, to ensure that the server has indeed recieved FIN_ACK.
+
+Once the server (child process) recieves a FIN_ACK, it will exit. The exiting of the child process will trigger a SIGCHILD, which will be delivered to the parent. This will in turn call a signal handler method, called exitChild_handler(), which will use the pid of the child that exited, and removes the corresponding connection from the link-list of existing connections. This will ensure that if this client issues another file transfer request in the future, it will not be mistaken as a duplicate request.
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
 
 
-  Modifications in file prifinfo_plus.c:
-  --------------------------------------
 
-  function  prifinfo  renamed  prifinfo_plus  (plus slight
-       modification in code so as to print out network mask)
 
 
 
