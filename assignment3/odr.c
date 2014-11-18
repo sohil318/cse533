@@ -1,6 +1,7 @@
 #include        "unp.h"
 #include	"odr.h"
 #include	"hw_addrs.h"
+#include        <sys/socket.h>
 
 char canonicalIP[STR_SIZE];
 char hostname[STR_SIZE];
@@ -134,6 +135,7 @@ void add_sunpath_port_info( char *sunpath, int port)
         }
 }
 
+
 /* Show sun_path vs port num table */
 void print_sunpath_port_map ()
 {
@@ -153,13 +155,72 @@ void print_sunpath_port_map ()
     return;
 }
 
+/* Create a Unix Datagram Socket */
+int createUXpacket(int family, int type, int protocol)
+{
+    int sockfd;
+    if ((sockfd = socket(family, type, protocol)) < 0)
+    {
+        printf("\nError creating Unix DATAGRAM SOCKET\n");
+        err_sys("socket error");
+        perror("socket");
+        return -1;
+    }
+    return sockfd;
+}
+
+/* Create a PF Packet Socket */
+int createPFpacket(int family, int type, int protocol)
+{
+    int sockfd;
+    if ((sockfd = socket(family, type, protocol)) < 0)
+    {
+        printf("\nError creating PF_PACKET SOCKET\n");
+        err_sys("socket error");
+        perror("socket");
+        return -1;
+    }
+    return sockfd;
+}
+
+/* Bind the Unix Datagram Socket */
+int BindUnixSocket(struct sockaddr_un *servAddr, char *sun_path, int uxsockfd) 
+{
+    unlink(sun_path);
+
+    bzero(servAddr, sizeof(struct sockaddr_un));
+    servAddr->sun_family = AF_LOCAL;
+    strncpy(servAddr->sun_path, SERV_SUN_PATH, strlen(SERV_SUN_PATH) - 1);
+    Bind(uxsockfd, (SA *)servAddr, SUN_LEN(servAddr));
+
+    return sizeof(servAddr);
+}
+
 int main (int argc, char **argv)
 {
+    int pfsockfd, uxsockfd, optval = -1;
+    struct sockaddr_un servAddr, checkAddr;
+
     printf("\nCanonical IP : %s\n",readInterfaces());
     print_interfaceInfo ();
     gethostname(hostname, sizeof(hostname));
     printf("\nHostname : %s\n", hostname);
-    add_sunpath_port_info(SERV_SUN_PATH, SERV_PORT);
+    
+    /* Create Unix Datagram Socket to bind to well-known server sunpath. */
+    if ((uxsockfd = createUXpacket(AF_LOCAL, SOCK_DGRAM, 0)) < 0)
+        return 1;
+    setsockopt(uxsockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+    int len = BindUnixSocket(&servAddr, SERV_SUN_PATH, uxsockfd); 
+    Getsockname(uxsockfd, (SA *) &checkAddr, &len);
+    printf("\nUnix Datagram socket for server created and bound name = %s, len = %d.\n", checkAddr.sun_path, len);
+
+    add_sunpath_port_info(SERV_SUN_PATH, SERV_PORT_NO);
     print_sunpath_port_map();
+    
+    if ((pfsockfd = createPFpacket(PF_PACKET, SOCK_RAW, htons(MY_PROTOCOL))) < 0)
+        return 1;
+    
+    
+
     return 0;
 }

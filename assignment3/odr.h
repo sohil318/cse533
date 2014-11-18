@@ -5,8 +5,9 @@
 #include    <net/if.h>
 #define     STR_SIZE        100
 #define     SERV_SUN_PATH   "serv_sun_path" 
-#define     SERV_PORT       5892
+#define     SERV_PORT_NO    5000
 #define     CLI_PORT        6000
+#define     MY_PROTOCOL     0x5892
 
 /* Interface Information structure to hold all interfaces of a machine */
 typedef struct InterfaceInfo {
@@ -27,7 +28,11 @@ typedef struct port_sunpath_dict {
 
 char* readInterfaces();
 void addInterfaceList(int idx, char *name, char *ip_addr, char *haddr);
+void print_interfaceInfo ();
 void add_sunpath_port_info( char *sunpath, int port);
+void print_sunpath_port_map ();
+int createUXpacket(int family, int type, int protocol);
+int createPFpacket(int family, int type, int protocol);
 
 
 #endif  /* __odr_h */
