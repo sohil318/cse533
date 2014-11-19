@@ -6,6 +6,7 @@
 #define     STR_SIZE        100
 #define     MAC_SIZE        6
 #define     IP_SIZE         16
+#define     DATA_SIZE       100
 #define     SERV_SUN_PATH   "serv_sun_path" 
 #define     SERV_PORT_NO    5000
 #define     CLI_PORT        6000
@@ -38,6 +39,20 @@ typedef struct routing_table_entry  {
     struct timeval ts;
     struct routing_table_entry *next;
 } rtabentry;
+
+/* ODR Frame of different types RREQ, RREP, DATA */
+typedef struct ODRpacket    {
+    int packet_type;
+    char src_ip[IP_SIZE];
+    int src_port;
+    char dst_ip[IP_SIZE];
+    int dest_port;
+    int broadcastid;
+    int hopcount;
+    char datamsg[DATA_SIZE];
+    int rep_already_sent;
+    int route_discovery;
+}odrpacket;
 
 char* readInterfaces();
 void addInterfaceList(int idx, char *name, char *ip_addr, char *haddr);

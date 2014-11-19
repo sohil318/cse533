@@ -225,21 +225,54 @@ void handleReqResp(int uxsockfd, int pfsockfd)
         if ( FD_ISSET(uxsockfd, &rset))
         {
             /* Check for client server sending messages to ODR layer */
-            handleUnixSocketInfofromClientServer();
+            handleUnixSocketInfofromClientServer(uxsockfd, pfsockfd);
         }
         else if ( FD_ISSET(pfsockfd, &rset))
         {
             /* Check for ODR sending messages to other VM's in ODR layer */
-            handlePFPacketSocketInfofromOtherODR();
+            handlePFPacketSocketInfofromOtherODR(uxsockfd, pfsockfd);
         }
     }
 }
 
-void handleUnixSocketInfofromClientServer()
+void handleUnixSocketInfofromClientServer(int uxsockfd, int pfsockfd)
 {
     printf("\nTODO");
+    msend msgdata;
+    odrpacket datapacket;
+    struct sockaddr_un saddr;
+    int size = sizeof(saddr);
+    port_spath_map *sunpathinfo;
+
+    bzero (&datapacket, sizeof(odrpacket));
+    bzero (&msgdata, sizeof(msend));
+
+    recvfrom(uxsockfd, (void *)&msgdata, sizeof(msend), 0, (struct sockaddr *)&saddr, &size);
+    
+    if (!strcmp(saddr.sun_path, SERV_SUN_PATH))
+    {
+        gethostname(hostname, sizeof(hostname));
+        printf("\nTime packet from server at %s", hostname);
+        datapacket.src_port = SERV_PORT_NO;
+    }
+    else
+    {
+        gethostname(hostname, sizeof(hostname));
+        printf("\nTime Request packet from client at %s", hostname);
+
+    }
+    sunpathinfo = sunpath_lookup(saddr.sun_path);
+
 }
-void handlePFPacketSocketInfofromOtherODR()
+
+port_spath_map * sunpath_lookup(char *sun_path)
+{
+
+    port_spath_map *temp = portsunhead;
+
+}
+
+void handlePFPacketSocketInfofromOtherODR(int uxsockfd, int pfsockfd)
 {
     printf("\nTODO");
 }
