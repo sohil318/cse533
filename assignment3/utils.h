@@ -23,5 +23,8 @@ typedef struct msg_recv_packet
     char msg[TS_SIZE];
 }mrecv;
 
+int msg_send(int sockfd, char *ip_dest, int dest_port, char *msg, int flag);
+int msg_recv(int sockfd, char* msg, char* ip_source, int source_port);
+
 #endif  /* __UTILS_h */
 
