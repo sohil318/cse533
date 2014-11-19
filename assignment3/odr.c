@@ -190,10 +190,58 @@ int BindUnixSocket(struct sockaddr_un *servAddr, char *sun_path, int uxsockfd)
 
     bzero(servAddr, sizeof(struct sockaddr_un));
     servAddr->sun_family = AF_LOCAL;
-    strncpy(servAddr->sun_path, SERV_SUN_PATH, strlen(SERV_SUN_PATH) - 1);
+    strncpy(servAddr->sun_path, sun_path, strlen(sun_path) - 1);
     Bind(uxsockfd, (SA *)servAddr, SUN_LEN(servAddr));
 
     return sizeof(servAddr);
+}
+
+/* Module to handle client and server requests and responses via UNIX DATAGRAM SOCKET
+ *
+ * Handle ODR Packets through PF_PACKET
+ */
+
+void handleReqResp(int uxsockfd, int pfsockfd)
+{
+    int nready;
+    fd_set rset, allset;
+    int maxfd = max(uxsockfd, pfsockfd) + 1;
+
+    FD_ZERO(&rset);
+    FD_SET(uxsockfd, &rset);
+    FD_SET(pfsockfd, &rset);
+    allset = rset;
+    for (;;)
+    {
+        rset = allset;
+        if ( (nready = select(maxfd, &rset, NULL, NULL, NULL)) < 0 )
+        {
+            if (errno == EINTR)
+                continue;
+            else
+                err_sys ("select error");
+        }
+
+        if ( FD_ISSET(uxsockfd, &rset))
+        {
+            /* Check for client server sending messages to ODR layer */
+            handleUnixSocketInfofromClientServer();
+        }
+        else if ( FD_ISSET(pfsockfd, &rset))
+        {
+            /* Check for ODR sending messages to other VM's in ODR layer */
+            handlePFPacketSocketInfofromOtherODR();
+        }
+    }
+}
+
+void handleUnixSocketInfofromClientServer()
+{
+    printf("\nTODO");
+}
+void handlePFPacketSocketInfofromOtherODR()
+{
+    printf("\nTODO");
 }
 
 int main (int argc, char **argv)
@@ -209,7 +257,7 @@ int main (int argc, char **argv)
     /* Create Unix Datagram Socket to bind to well-known server sunpath. */
     if ((uxsockfd = createUXpacket(AF_LOCAL, SOCK_DGRAM, 0)) < 0)
         return 1;
-    setsockopt(uxsockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+    //setsockopt(uxsockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
     int len = BindUnixSocket(&servAddr, SERV_SUN_PATH, uxsockfd); 
     Getsockname(uxsockfd, (SA *) &checkAddr, &len);
     printf("\nUnix Datagram socket for server created and bound name = %s, len = %d.\n", checkAddr.sun_path, len);
@@ -220,7 +268,7 @@ int main (int argc, char **argv)
     if ((pfsockfd = createPFpacket(PF_PACKET, SOCK_RAW, htons(MY_PROTOCOL))) < 0)
         return 1;
     
-    
+    handleReqResp(uxsockfd, pfsockfd);    
 
     return 0;
 }

@@ -4,6 +4,8 @@
 #include    "unp.h"
 #include    <net/if.h>
 #define     STR_SIZE        100
+#define     MAC_SIZE        6
+#define     IP_SIZE         16
 #define     SERV_SUN_PATH   "serv_sun_path" 
 #define     SERV_PORT_NO    5000
 #define     CLI_PORT        6000
@@ -14,7 +16,7 @@ typedef struct InterfaceInfo {
     int ifaceIdx;
     char ifaceName[STR_SIZE];
     char ifaddr[STR_SIZE];
-    char haddr[6];
+    char haddr[MAC_SIZE];
     struct InterfaceInfo *next;
 }ifaceInfo;
 
@@ -26,6 +28,17 @@ typedef struct port_sunpath_dict {
     struct port_sunpath_dict *next;
 }port_spath_map;
 
+/* Structure with routing table entry. */
+typedef struct routing_table_entry  {
+    char destIP[IP_SIZE];
+    char next_hop_MAC[MAC_SIZE];
+    int ifaceIdx;
+    int hopcount;
+    int broadcastId;
+    struct timeval ts;
+    struct routing_table_entry *next;
+} rtabentry;
+
 char* readInterfaces();
 void addInterfaceList(int idx, char *name, char *ip_addr, char *haddr);
 void print_interfaceInfo ();
@@ -34,5 +47,9 @@ void print_sunpath_port_map ();
 int createUXpacket(int family, int type, int protocol);
 int createPFpacket(int family, int type, int protocol);
 
+int BindUnixSocket(struct sockaddr_un *servAddr, char *sun_path, int uxsockfd);
+void handleReqResp(int uxsockfd, int pfsockfd);
+void handleUnixSocketInfofromClientServer();
+void handlePFPacketSocketInfofromOtherODR();
 
 #endif  /* __odr_h */
