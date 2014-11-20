@@ -7,7 +7,7 @@ static sigjmp_buf jmpbuf;
 
 static void timeout_resend(int signo)
 {
-        printf("client at node %s timeout on response from %s", clientVM, serverVM);
+        printf("\n client at node %s timeout on response from %s", clientVM, serverVM);
         siglongjmp(jmpbuf, 1);
 }
 
@@ -56,10 +56,10 @@ int main(int argc, char **argv)
                 printf("\nClient at node %s sending request to server at %s", clientVM, serverVM);
 	   sending:
 		msg_send(sockfd, ip_dest, 5000, send_msg, flag);	//yet to be filled
-		alarm(50);
+		alarm(5);
 		if(sigsetjmp(jmpbuf,1)!=0)
         	{
-			if(flag = 0) {
+			if(flag == 0) {
 				flag = 1;     
 				goto sending;
 			}   	

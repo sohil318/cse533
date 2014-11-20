@@ -28,7 +28,7 @@ typedef struct InterfaceInfo {
 typedef struct port_sunpath_dict {
     int port;
     char sun_path[STR_SIZE];
-    struct tm *ts;
+    struct timeval ts;
     struct port_sunpath_dict *next;
 }port_spath_map;
 

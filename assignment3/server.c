@@ -35,7 +35,7 @@ int main(int argv, char **argc){
         printf("\nServer at node %s responding to request from %s", serverVM, hp->h_name);
         time_s = time(NULL);
         bzero(reply, sizeof(reply));
-        snprintf(reply,sizeof(reply),"%.24s\r\n",(char *)ctime(&time_s));
+        snprintf(reply,sizeof(reply),"%.24s",(char *)ctime(&time_s));
         
         msg_send(sockfd, recvmsg.srcIP, recvmsg.srcportno, reply, 0);
     }

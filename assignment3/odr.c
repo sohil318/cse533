@@ -3,12 +3,14 @@
 #include        "utils.h"
 #include	"hw_addrs.h"
 #include        <sys/socket.h>
+#include 	<sys/time.h>
 
 char canonicalIP[STR_SIZE];
 char hostname[STR_SIZE];
 ifaceInfo *iface = NULL;
 port_spath_map *portsunhead = NULL;
 int max_port = CLI_PORT;
+int staleness_parameter = 5;
 
 /* Pre defined functions given to read all interfaces and their IP and MAC addresses */
 char* readInterfaces()
@@ -119,12 +121,10 @@ void add_sunpath_port_info( char *sunpath, int port)
     
     /* Get Current time stamp . Reference cplusplus.com */
     
-    time_t rawtime;
-    struct tm* timeinfo;
-    time (&rawtime);
-    timeinfo = localtime(&rawtime);
+    struct timeval current_time;
+    gettimeofday(&current_time, NULL);	 
     
-    newentry->ts = timeinfo;
+    newentry->ts = current_time;
     newentry->next = NULL;
 
     /* Insert new entry to linked list */
@@ -144,12 +144,12 @@ void print_sunpath_port_map ()
     port_spath_map *temp = portsunhead;
     if (temp == NULL)
         return;
-    printf("\n----------------------------------");
-    printf("\n--- PORTNUM --- | --- SUN_PATH ---");
-    printf("\n----------------------------------");
+    printf("\n------------------------------------------------------");
+    printf("\n--- PORTNUM --- | --- SUN_PATH ---| --- TIMESTAMP ---");
+    printf("\n------------------------------------------------------");
     while (temp != NULL)
     {
-        printf("\n      %4d      |  %3s", temp->port, temp->sun_path);
+        printf("\n      %4d      |  %3s     |   %ld ", temp->port, temp->sun_path, (long)temp->ts.tv_sec);
         temp = temp->next;
     }
     printf("\n----------------------------------");
@@ -278,6 +278,44 @@ void handleUnixSocketInfofromClientServer(int uxsockfd, int pfsockfd)
     }
 }
 
+/* Deleting an entry from linkedlist*/
+void delete_entry(int port)
+{
+        port_spath_map *temp = portsunhead;
+                if(portsunhead->port == port)
+                { 
+                        portsunhead = portsunhead->next;
+                        return;
+                }
+                else 
+                {
+                        while(temp)
+                        {
+                                if(temp->next->port == port)
+                                {
+                                        temp->next = temp->next->next;
+                                        return;
+                                }
+                                temp = temp->next;
+                        }
+                }
+}
+
+/* returns 1 if the entry is stale else 0*/
+int isStale(struct timeval ts)
+{
+	long staleness;
+	struct timeval current_ts;
+	gettimeofday(&current_ts, NULL);
+//	staleness = timevaldiff(&ts, &current_ts);
+	staleness = (current_ts.tv_sec - ts.tv_sec)*1000;
+	staleness += (current_ts.tv_usec - ts.tv_usec)/1000;
+	if(staleness > staleness_parameter*1000)
+		return 1;
+	else
+		return 0;
+}
+
 
 /* Lookup Sunpath Info from sunpath_portnum linked list */
 
@@ -287,7 +325,17 @@ port_spath_map * sunpath_lookup(char *sun_path)
     while (temp)
     {
         if (strcmp(temp->sun_path,sun_path) == 0)
-            return temp;
+	{
+		if((isStale(temp->ts)) && (temp->port != SERV_PORT_NO))
+		{
+			delete_entry(temp->port);
+			return NULL;
+		}
+		else
+		{
+			return temp;
+		}	
+	}	
         temp = temp->next;
     }
     return temp;
@@ -299,12 +347,24 @@ port_spath_map * sunpath_lookup(char *sun_path)
 port_spath_map * port_lookup(int port)
 {
     port_spath_map *temp = portsunhead;
+    
     while (temp)
     {
-        if (temp->port == port)
-            return temp;
-        temp = temp->next;
-    }
+	if(temp->port == port)
+	{
+        	if ((isStale(temp->ts)) && (port != SERV_PORT_NO))
+        	{	
+	    		delete_entry(port);
+			return NULL;
+    		}	
+		else
+		{
+			return temp;
+		}
+    	}
+	temp = temp->next;
+
+     }	
     return temp;
 }
 
@@ -375,9 +435,18 @@ void handlePFPacketSocketInfofromOtherODR(int uxsockfd, int pfsockfd)
 
 int main (int argc, char **argv)
 {
+
     int pfsockfd, uxsockfd, optval = -1, len;
     struct sockaddr_un servAddr, checkAddr;
-
+    if(argc>1)
+    {
+	staleness_parameter = atoi(argv[1]);
+    }
+    else
+    {
+	printf("\n Please enter a staleness parameter! \n");
+	exit(0);
+    }
     printf("\nCanonical IP : %s\n",readInterfaces());
     print_interfaceInfo ();
     gethostname(hostname, sizeof(hostname));
