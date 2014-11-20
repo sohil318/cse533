@@ -1,8 +1,11 @@
 
 CC = gcc
 
-HOME = /users/cse533/Stevens/unpv13e
-ASSGN3 = /users/cse533/Asgn3_code
+HOME=/home/stufs1/sogandhi/cse533/Stevens
+ASSGN3=/home/stufs1/sogandhi/cse533/Asgn3_code
+
+#HOME = /users/cse533/Stevens/unpv13e
+#ASSGN3 = /users/cse533/Asgn3_code
 
 LIBS = -lresolv -lnsl -lpthread\
     ${HOME}/libunp.a\

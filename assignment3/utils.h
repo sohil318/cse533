@@ -2,7 +2,6 @@
 #define __UTILS_h
 
 #include    "unp.h"
-#include    <net/if.h>
 #define     IP_SIZE     16
 #define     TS_SIZE     512
 

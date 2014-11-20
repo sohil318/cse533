@@ -232,6 +232,7 @@ void handleUnixSocketInfofromClientServer(int uxsockfd, int pfsockfd)
 {
     msend msgdata;
     char msg_stream[MSG_STREAM_SIZE];
+    
     odrpacket datapacket;
     struct sockaddr_un saddr;
     int size = sizeof(saddr);
@@ -307,7 +308,6 @@ int isStale(struct timeval ts)
 	long staleness;
 	struct timeval current_ts;
 	gettimeofday(&current_ts, NULL);
-//	staleness = timevaldiff(&ts, &current_ts);
 	staleness = (current_ts.tv_sec - ts.tv_sec)*1000;
 	staleness += (current_ts.tv_usec - ts.tv_usec)/1000;
 	if(staleness > staleness_parameter*1000)
@@ -433,12 +433,120 @@ void handlePFPacketSocketInfofromOtherODR(int uxsockfd, int pfsockfd)
     printf("\nTODO");
 }
 
+/*  Complete ODR Frame  REF ==> http://aschauf.landshut.org/fh/linux/udp_vs_raw/ch01s03.html   */
+
+void sendODR(int sockfd, odrpacket *packet, char *src_mac, char *dst_mac, int ifaceidx)
+{
+        int send_result = 0;
+
+        struct sockaddr_ll socket_address;                              /*      target address                                  */
+        void* buffer = (void*)malloc(ETHR_FRAME_LEN);                    /*      buffer for ethernet frame                       */
+        unsigned char* etherhead = buffer;                              /*      pointer to ethenet header                       */
+        unsigned char* data = buffer + 14;                              /*      userdata in ethernet frame                      */  
+
+        struct ethhdr *eh = (struct ethhdr *)etherhead;                 /*      another pointer to ethernet header              */
+
+        /*      Prepare sockaddr_ll     */
+        socket_address.sll_family   =   PF_PACKET;                      /*      RAW communication                               */  
+        socket_address.sll_protocol =   htons(ETH_P_IP);                /*      We don't use a protocoll above ethernet layer just use anything here.  */
+        socket_address.sll_ifindex  =   ifaceidx;                       /*      Interface Index of the network device in function parameter     */
+
+        
+        socket_address.sll_hatype   =   ARPHRD_ETHER;                   /*      ARP hardware identifier is ethernet             */  
+        
+        socket_address.sll_pkttype  =   PACKET_OTHERHOST;               /*      Target is another host.                         */  
+
+        socket_address.sll_halen    =   MAC_SIZE;                       /*      Address length                                  */
+
+        /*      MAC - begin     */
+        socket_address.sll_addr[0]  =   dst_mac[0];             
+        socket_address.sll_addr[1]  =   dst_mac[1];             
+        socket_address.sll_addr[2]  =   dst_mac[2];  
+        socket_address.sll_addr[3]  =   dst_mac[3];  
+        socket_address.sll_addr[4]  =   dst_mac[4];
+        socket_address.sll_addr[5]  =   dst_mac[5];
+        /*      MAC - end       */
+
+        socket_address.sll_addr[6]  =   0x00;                           /*      not used                                        */
+        socket_address.sll_addr[7]  =   0x00;                           /*      not used                                        */      
+
+        memcpy((void*)buffer, (void*)dst_mac, MAC_SIZE);                /*      Set Dest Mac in the ethernet frame header       */
+        memcpy((void*)(buffer + MAC_SIZE), (void*)src_mac, MAC_SIZE);   /*      Set Src Mac in the ethernet frame header        */  
+        eh->h_proto = htons(MY_PROTOCOL);
+
+        memcpy((void *)data, (void *)packet, sizeof(odrpacket));        /*      Fill the frame with ODR Packet                  */
+        
+        /*send the packet*/
+        send_result = sendto(sockfd, buffer, ETHR_FRAME_LEN, 0, (struct sockaddr *) &socket_address, sizeof(socket_address));
+
+        if (send_result == -1) 
+        {
+                printf("\nError in Sending ODR");
+                perror("sendto");
+        }
+
+}
+
+
+/* Create RREQ Message          */
+
+odrpacket * createRREQMessage (char *srcIP, char *destIP, int sport, int dport, int bid, int hop, int flag, int asent)
+{
+        odrpacket *packet = (odrpacket *)malloc(sizeof(odrpacket));
+
+        packet->packet_type          =     htonl(RREQ);
+        packet->src_port             =     htonl(sport);
+        packet->dest_port            =     htonl(dport);
+        packet->hopcount             =     htonl(hop);
+        packet->broadcastid          =     htonl(bid);
+        packet->route_discovery      =     htonl(flag);
+        packet->rep_already_sent     =     htonl(asent);
+        strcpy(packet->src_ip, srcIP);
+        strcpy(packet->dst_ip, destIP);
+
+        return packet;
+}
+
+/* Create RREP Message          */
+odrpacket * createRREPMessage (char *srcIP, char *destIP, int sport, int dport, int bid, int hop, int flag)
+{
+        odrpacket *packet = (odrpacket *)malloc(sizeof(odrpacket));
+
+        packet->packet_type     =     htonl(RREP);
+        packet->src_port        =     htonl(sport);
+        packet->dest_port       =     htonl(dport);
+        packet->hopcount        =     htonl(hop);
+        packet->broadcastid     =     htonl(bid);
+        packet->route_discovery =     htonl(flag);
+        strcpy(packet->src_ip, srcIP);
+        strcpy(packet->dst_ip, destIP);
+
+        return packet;
+}
+
+/* Create DATA Message          */
+odrpacket * createDataMessage (char *srcIP, char *destIP, int bid, int sport, int dport, int hop, char *msg)
+{
+        odrpacket *packet = (odrpacket *)malloc(sizeof(odrpacket));
+
+        packet->packet_type     =     htonl(DATA);
+        packet->src_port        =     htonl(sport);
+        packet->dest_port       =     htonl(dport);
+        packet->hopcount        =     htonl(hop);
+        packet->broadcastid     =     htonl(bid);
+        strcpy(packet->src_ip, srcIP);
+        strcpy(packet->dst_ip, destIP);
+        strcpy(packet->datamsg, msg);
+
+        return packet;
+}
+
 int main (int argc, char **argv)
 {
 
     int pfsockfd, uxsockfd, optval = -1, len;
     struct sockaddr_un servAddr, checkAddr;
-    if(argc>1)
+    if(argc > 1)
     {
 	staleness_parameter = atoi(argv[1]);
     }

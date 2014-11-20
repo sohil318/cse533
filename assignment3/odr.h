@@ -3,27 +3,42 @@
 
 #include    "unp.h"
 #include    "utils.h"
-#include    <net/if.h>
-#define     STR_SIZE            100
-#define     MAC_SIZE            6
-#define     IP_SIZE             16
-#define     DATA_SIZE           100
-#define     UNIX_DGRAM_PATH     "unix_path"
-#define     SERV_SUN_PATH       "serv_path" 
+#include    <sys/socket.h>
+#include    <linux/if_ether.h>
+#include    <linux/if_arp.h>
+
+
 #define     SERV_PORT_NO        5000
 #define     CLI_PORT            6000
 #define     MY_PROTOCOL         0x5892
-#define     MSG_STREAM_SIZE     1000
+#define     UNIX_DGRAM_PATH     "unix_path"
+#define     SERV_SUN_PATH       "serv_path" 
 
+#define     RREQ                1
+#define     RREP                2
+#define     DATA                3
+
+#define     MAC_SIZE            6
+#define     IP_SIZE             16
+#define     STR_SIZE            100
+#define     DATA_SIZE           1440
+#define     MSG_STREAM_SIZE     1440
+
+#define     ETHR_FRAME_LEN       1514
+
+
+/***********************************************************************/
 /* Interface Information structure to hold all interfaces of a machine */
 typedef struct InterfaceInfo {
     int ifaceIdx;
     char ifaceName[STR_SIZE];
-    char ifaddr[STR_SIZE];
+    char ifaddr[IP_SIZE];
     char haddr[MAC_SIZE];
     struct InterfaceInfo *next;
 }ifaceInfo;
+/***********************************************************************/
 
+/***********************************************************************/
 /* Structure to store map of sunpath and port number. */
 typedef struct port_sunpath_dict {
     int port;
@@ -31,7 +46,9 @@ typedef struct port_sunpath_dict {
     struct timeval ts;
     struct port_sunpath_dict *next;
 }port_spath_map;
+/***********************************************************************/
 
+/***********************************************************************/
 /* Structure with routing table entry. */
 typedef struct routing_table_entry  {
     char destIP[IP_SIZE];
@@ -42,7 +59,9 @@ typedef struct routing_table_entry  {
     struct timeval ts;
     struct routing_table_entry *next;
 } rtabentry;
+/***********************************************************************/
 
+/***********************************************************************/
 /* ODR Frame of different types RREQ, RREP, DATA */
 typedef struct ODRpacket    {
     int packet_type;
@@ -52,10 +71,15 @@ typedef struct ODRpacket    {
     int dest_port;
     int broadcastid;
     int hopcount;
-    char datamsg[DATA_SIZE];
     int rep_already_sent;
     int route_discovery;
+    char datamsg[DATA_SIZE];
 }odrpacket;
+/***********************************************************************/
+
+
+
+/************************************************************************************************************************************************/
 
 char* readInterfaces();
 void addInterfaceList(int idx, char *name, char *ip_addr, char *haddr);
@@ -72,5 +96,7 @@ void handlePFPacketSocketInfofromOtherODR(int uxsockfd, int pfsockfd);
 port_spath_map * sunpath_lookup(char *sun_path);
 port_spath_map * port_lookup(int port);
 void client_server_same_vm(int uxsockfd, int pfsockfd, msend *msgdata, struct sockaddr_un *saddr);
+
+/************************************************************************************************************************************************/
 
 #endif  /* __odr_h */
