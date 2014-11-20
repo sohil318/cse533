@@ -2,15 +2,18 @@
 #define __ODR_h
 
 #include    "unp.h"
+#include    "utils.h"
 #include    <net/if.h>
-#define     STR_SIZE        100
-#define     MAC_SIZE        6
-#define     IP_SIZE         16
-#define     DATA_SIZE       100
-#define     SERV_SUN_PATH   "serv_sun_path" 
-#define     SERV_PORT_NO    5000
-#define     CLI_PORT        6000
-#define     MY_PROTOCOL     0x5892
+#define     STR_SIZE            100
+#define     MAC_SIZE            6
+#define     IP_SIZE             16
+#define     DATA_SIZE           100
+#define     UNIX_DGRAM_PATH     "unix_path"
+#define     SERV_SUN_PATH       "serv_path" 
+#define     SERV_PORT_NO        5000
+#define     CLI_PORT            6000
+#define     MY_PROTOCOL         0x5892
+#define     MSG_STREAM_SIZE     1000
 
 /* Interface Information structure to hold all interfaces of a machine */
 typedef struct InterfaceInfo {
@@ -64,7 +67,10 @@ int createPFpacket(int family, int type, int protocol);
 
 int BindUnixSocket(struct sockaddr_un *servAddr, char *sun_path, int uxsockfd);
 void handleReqResp(int uxsockfd, int pfsockfd);
-void handleUnixSocketInfofromClientServer();
-void handlePFPacketSocketInfofromOtherODR();
+void handleUnixSocketInfofromClientServer(int uxsockfd, int pfsockfd);
+void handlePFPacketSocketInfofromOtherODR(int uxsockfd, int pfsockfd);
+port_spath_map * sunpath_lookup(char *sun_path);
+port_spath_map * port_lookup(int port);
+void client_server_same_vm(int uxsockfd, int pfsockfd, msend *msgdata, struct sockaddr_un *saddr);
 
 #endif  /* __odr_h */

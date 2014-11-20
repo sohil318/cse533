@@ -1,5 +1,6 @@
 #include        "unp.h"
 #include	"odr.h"
+#include        "utils.h"
 #include	"hw_addrs.h"
 #include        <sys/socket.h>
 
@@ -7,6 +8,7 @@ char canonicalIP[STR_SIZE];
 char hostname[STR_SIZE];
 ifaceInfo *iface = NULL;
 port_spath_map *portsunhead = NULL;
+int max_port = CLI_PORT;
 
 /* Pre defined functions given to read all interfaces and their IP and MAC addresses */
 char* readInterfaces()
@@ -183,18 +185,6 @@ int createPFpacket(int family, int type, int protocol)
     return sockfd;
 }
 
-/* Bind the Unix Datagram Socket */
-int BindUnixSocket(struct sockaddr_un *servAddr, char *sun_path, int uxsockfd) 
-{
-    unlink(sun_path);
-
-    bzero(servAddr, sizeof(struct sockaddr_un));
-    servAddr->sun_family = AF_LOCAL;
-    strncpy(servAddr->sun_path, sun_path, strlen(sun_path) - 1);
-    Bind(uxsockfd, (SA *)servAddr, SUN_LEN(servAddr));
-
-    return sizeof(servAddr);
-}
 
 /* Module to handle client and server requests and responses via UNIX DATAGRAM SOCKET
  *
@@ -225,6 +215,7 @@ void handleReqResp(int uxsockfd, int pfsockfd)
         if ( FD_ISSET(uxsockfd, &rset))
         {
             /* Check for client server sending messages to ODR layer */
+            printf("\nHandling Client/Server Message at ODR.\n");
             handleUnixSocketInfofromClientServer(uxsockfd, pfsockfd);
         }
         else if ( FD_ISSET(pfsockfd, &rset))
@@ -235,10 +226,12 @@ void handleReqResp(int uxsockfd, int pfsockfd)
     }
 }
 
+/* Logic for handling Client/Server Message via Unix Domain Socket */
+
 void handleUnixSocketInfofromClientServer(int uxsockfd, int pfsockfd)
 {
-    printf("\nTODO");
     msend msgdata;
+    char msg_stream[MSG_STREAM_SIZE];
     odrpacket datapacket;
     struct sockaddr_un saddr;
     int size = sizeof(saddr);
@@ -246,9 +239,18 @@ void handleUnixSocketInfofromClientServer(int uxsockfd, int pfsockfd)
 
     bzero (&datapacket, sizeof(odrpacket));
     bzero (&msgdata, sizeof(msend));
-
-    recvfrom(uxsockfd, (void *)&msgdata, sizeof(msend), 0, (struct sockaddr *)&saddr, &size);
     
+    recvfrom(uxsockfd, msg_stream, MSG_STREAM_SIZE, 0, (struct sockaddr *)&saddr, &size);
+    
+    convertstreamtosendpacket(&msgdata, msg_stream);
+
+    if (strcmp(msgdata.destIP, canonicalIP) == 0)
+    {
+        printf("\nProcessing same node request.");
+        client_server_same_vm(uxsockfd, pfsockfd, &msgdata, &saddr);
+        return;
+    }
+
     if (!strcmp(saddr.sun_path, SERV_SUN_PATH))
     {
         gethostname(hostname, sizeof(hostname));
@@ -259,18 +261,112 @@ void handleUnixSocketInfofromClientServer(int uxsockfd, int pfsockfd)
     {
         gethostname(hostname, sizeof(hostname));
         printf("\nTime Request packet from client at %s", hostname);
-
+        sunpathinfo = sunpath_lookup(saddr.sun_path);
+        if (sunpathinfo == NULL)
+        {
+            printf("\nAdding new client info\n");        
+            datapacket.src_port = max_port;
+            max_port++;
+            add_sunpath_port_info(saddr.sun_path, datapacket.src_port);
+            print_sunpath_port_map();
+        }
+        else
+        {
+            printf("\nExisting client found : %s\n", saddr.sun_path);        
+            datapacket.src_port = sunpathinfo->port;
+        }
     }
-    sunpathinfo = sunpath_lookup(saddr.sun_path);
-
 }
+
+
+/* Lookup Sunpath Info from sunpath_portnum linked list */
 
 port_spath_map * sunpath_lookup(char *sun_path)
 {
-
     port_spath_map *temp = portsunhead;
-
+    while (temp)
+    {
+        if (strcmp(temp->sun_path,sun_path) == 0)
+            return temp;
+        temp = temp->next;
+    }
+    return temp;
 }
+
+
+/* Lookup Sunpath Info from sunpath_portnum linked list */
+
+port_spath_map * port_lookup(int port)
+{
+    port_spath_map *temp = portsunhead;
+    while (temp)
+    {
+        if (temp->port == port)
+            return temp;
+        temp = temp->next;
+    }
+    return temp;
+}
+
+
+/* Handle Client and Server Communication on same node */
+
+void client_server_same_vm(int uxsockfd, int pfsockfd, msend *msgdata, struct sockaddr_un *saddr)
+{
+    mrecv recvp;
+    struct sockaddr_un clientaddr;
+    port_spath_map *sunpathinfo;
+    char msg_stream[MSG_STREAM_SIZE];
+
+    bzero(&clientaddr, sizeof(struct sockaddr_un));
+
+    if (strcmp(saddr->sun_path, SERV_SUN_PATH) == 0)
+    {
+        gethostname(hostname, sizeof(hostname));
+        printf("\nTime packet from server at %s", hostname);
+        recvp.srcportno = SERV_PORT_NO;
+        sunpathinfo = port_lookup(msgdata->destportno);
+        if (sunpathinfo == NULL)
+        {
+            printf("\nStaleness limit reached. Packets Dropped.\n");
+            return;
+        }
+        strcpy(clientaddr.sun_path, sunpathinfo->sun_path);
+        clientaddr.sun_family = AF_LOCAL;
+    }
+    else
+    {
+        gethostname(hostname, sizeof(hostname));
+        printf("\nTime Request packet from client at %s", hostname);
+        sunpathinfo = sunpath_lookup(saddr->sun_path);
+        if (sunpathinfo == NULL)
+        {
+            printf("\nAdding new client info sunpath = %s\n", saddr->sun_path);        
+            recvp.srcportno = max_port;
+            max_port++;
+            add_sunpath_port_info(saddr->sun_path, recvp.srcportno);
+            print_sunpath_port_map();
+        }
+        else
+        {
+            printf("\nExisting client info sunpath = %s\n", saddr->sun_path);        
+            recvp.srcportno = sunpathinfo->port;
+        }
+        strcpy(clientaddr.sun_path, SERV_SUN_PATH);
+        clientaddr.sun_family = AF_LOCAL;
+    }
+
+    strcpy(recvp.srcIP, msgdata->destIP);
+    strcpy(recvp.msg, msgdata->msg);
+
+    sprintf(msg_stream, "%s;%d;%s", recvp.srcIP, recvp.srcportno, recvp.msg);
+    
+    printf("\nSending Stream : %s   to sun_path = %s", msg_stream, clientaddr.sun_path);
+    sendto(uxsockfd, msg_stream, sizeof(msg_stream), 0, (struct sockaddr *)&clientaddr, (socklen_t)sizeof(clientaddr));
+    return;
+}
+
+/* Sending PF Packets across ODR layer */
 
 void handlePFPacketSocketInfofromOtherODR(int uxsockfd, int pfsockfd)
 {
@@ -279,7 +375,7 @@ void handlePFPacketSocketInfofromOtherODR(int uxsockfd, int pfsockfd)
 
 int main (int argc, char **argv)
 {
-    int pfsockfd, uxsockfd, optval = -1;
+    int pfsockfd, uxsockfd, optval = -1, len;
     struct sockaddr_un servAddr, checkAddr;
 
     printf("\nCanonical IP : %s\n",readInterfaces());
@@ -290,9 +386,17 @@ int main (int argc, char **argv)
     /* Create Unix Datagram Socket to bind to well-known server sunpath. */
     if ((uxsockfd = createUXpacket(AF_LOCAL, SOCK_DGRAM, 0)) < 0)
         return 1;
+    
     //setsockopt(uxsockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
-    int len = BindUnixSocket(&servAddr, SERV_SUN_PATH, uxsockfd); 
+    unlink(UNIX_DGRAM_PATH);
+    bzero(&servAddr, sizeof(struct sockaddr_un));
+    servAddr.sun_family = AF_LOCAL;
+    strcpy(servAddr.sun_path, UNIX_DGRAM_PATH);
+    Bind(uxsockfd, (SA *)&servAddr, SUN_LEN(&servAddr));
+
+    len = sizeof(servAddr);
     Getsockname(uxsockfd, (SA *) &checkAddr, &len);
+    
     printf("\nUnix Datagram socket for server created and bound name = %s, len = %d.\n", checkAddr.sun_path, len);
 
     add_sunpath_port_info(SERV_SUN_PATH, SERV_PORT_NO);

@@ -14,8 +14,8 @@ CFLAGS =  ${FLAGS} -I${HOME}/lib -I${ASSGN3}/
 
 all: odr client server
 
-odr: odr.o get_hw_addrs.o 
-	${CC} -o odr odr.o get_hw_addrs.o ${LIBS}
+odr: odr.o get_hw_addrs.o utils.o
+	${CC} -o odr odr.o get_hw_addrs.o utils.o ${LIBS}
 odr.o: odr.c
 	${CC} ${CFLAGS} -c odr.c
 

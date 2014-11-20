@@ -1,5 +1,7 @@
 #include "unp.h"
+#include "utils.h"
 #include  <setjmp.h>
+
 char serverVM[255], clientVM[255];
 static sigjmp_buf jmpbuf;
 
@@ -12,8 +14,9 @@ static void timeout_resend(int signo)
 int main(int argc, char **argv)
 {	
 	int sockfd, fd, source_port;
-	char temp[100], recvd_msg[255];
-	char send_msg[255] = "Time requested from server\n";
+	char temp[100];
+        mrecv recvd_msg;
+	char send_msg[1000] = "Time requested from server.";
 	struct sockaddr_un clientaddr, serveraddr;
 	struct hostent *hp;
 	char ip_dest[100];
@@ -36,16 +39,21 @@ int main(int argc, char **argv)
     	unlink(temp);
 	strncpy(clientaddr.sun_path, temp, sizeof(clientaddr.sun_path) - 1);
 	Bind(sockfd, (SA *) &clientaddr, SUN_LEN(&clientaddr));
-	
+        printf("\nClient bound at sun_path : %s", clientaddr.sun_path);	
 	gethostname(clientVM, sizeof(clientVM));
 	while(1) {
 	   userinput:
 		flag = 0;
-		printf("Select the VM server node : vm1, vm2, vm3, ..., vm10 \n");
-		scanf("%s",&serverVM);
-		hp = (struct hostent*)gethostbyname((const char *)serverVM);	
-		inet_ntop(hp->h_addrtype,hp->h_addr_list,ip_dest,100);
-		printf("client at node %s sending request to server at %s", clientVM, serverVM);
+		printf("\nSelect the VM server node : vm1, vm2, vm3, ..., vm10 \n");
+		
+                if ( scanf("%s",serverVM) != 1)
+                    continue;
+		
+                hp = (struct hostent *)gethostbyname((const char *)serverVM);	
+
+		sprintf(ip_dest, "%s", (char *)inet_ntoa( *(struct in_addr *)(hp->h_addr_list[0])));
+	        printf("\nServer canonical IP : %s", ip_dest);	
+                printf("\nClient at node %s sending request to server at %s", clientVM, serverVM);
 	   sending:
 		msg_send(sockfd, ip_dest, 5000, send_msg, flag);	//yet to be filled
 		alarm(50);
@@ -59,7 +67,10 @@ int main(int argc, char **argv)
 				goto userinput;
 			}	
 		}	
-		msg_recv(sockfd, recvd_msg, ip_source, source_port);	//yet to be filled
+                msg_recv(sockfd, &recvd_msg, &serveraddr);  
+		//msg_recv(sockfd, recvd_msg, ip_source, source_port);	//yet to be filled
+		printf("\nClient received time %s from server at %s", recvd_msg.msg, recvd_msg.srcIP);
+                
 		alarm(0);
 		}
 }
