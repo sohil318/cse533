@@ -223,6 +223,7 @@ void handleReqResp(int uxsockfd, int pfsockfd)
                 else if ( FD_ISSET(pfsockfd, &rset))
                 {
                         /* Check for ODR sending messages to other VM's in ODR layer */
+                        /* TODO : Shipra Start here */
                         handlePFPacketSocketInfofromOtherODR(uxsockfd, pfsockfd);
                 }
         }
