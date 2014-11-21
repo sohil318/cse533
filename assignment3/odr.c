@@ -5,13 +5,14 @@
 #include        <sys/socket.h>
 #include 	<sys/time.h>
 
-char canonicalIP[STR_SIZE];
+char canonicalIP[IP_SIZE];
 char hostname[STR_SIZE];
 ifaceInfo *iface = NULL;
 port_spath_map *portsunhead = NULL;
 int max_port = CLI_PORT;
 long staleness_parameter = 5;
 rtabentry *routinghead = NULL;
+int broadcast_id = 1000;
 
 /* Pre defined functions given to read all interfaces and their IP and MAC addresses */
 char* readInterfaces()
@@ -232,19 +233,20 @@ void handleReqResp(int uxsockfd, int pfsockfd)
 void handleUnixSocketInfofromClientServer(int uxsockfd, int pfsockfd)
 {
         msend msgdata;
-        char msg_stream[MSG_STREAM_SIZE];
+        char msg_stream[DATA_SIZE];
 
-        odrpacket datapacket;
-        char srcip[IP_SIZE], destip[IP_SIZE];
-        int sport, dport;
+        odrpacket *packet;
+        char src_mac[MAC_SIZE], dst_mac[MAC_SIZE], msg[DATA_SIZE], srcip[IP_SIZE], destip[IP_SIZE];
+        int sport = 0, dport = 0, hop = 0, ifaceidx = 0, bid = 0, flag = 0, asent = 0;
+
         struct sockaddr_un saddr;
         int size = sizeof(saddr);
         port_spath_map *sunpathinfo;
 
-        bzero (&datapacket, sizeof(odrpacket));
+        bzero (&packet, sizeof(odrpacket));
         bzero (&msgdata, sizeof(msend));
 
-        recvfrom(uxsockfd, msg_stream, MSG_STREAM_SIZE, 0, (struct sockaddr *)&saddr, &size);
+        recvfrom(uxsockfd, msg_stream, DATA_SIZE, 0, (struct sockaddr *)&saddr, &size);
 
         convertstreamtosendpacket(&msgdata, msg_stream);
 
@@ -271,7 +273,7 @@ void handleUnixSocketInfofromClientServer(int uxsockfd, int pfsockfd)
                         printf("\nAdding new client info\n");        
                         sport = max_port;
                         max_port++;
-                        add_sunpath_port_info(saddr.sun_path, datapacket.src_port);
+                        add_sunpath_port_info(saddr.sun_path, max_port);
                         print_sunpath_port_map();
                 }
                 else
@@ -283,14 +285,48 @@ void handleUnixSocketInfofromClientServer(int uxsockfd, int pfsockfd)
         strcpy (srcip, canonicalIP);
         strcpy (destip,   msgdata.destIP);
         dport = msgdata.destportno;
+        hop = 0;
         
-//        routing_table_lookup();
-        //if
-/*
-        createRREQMessage (char *srcIP, char *destIP, int sport, int dport, int bid, int hop, int flag, int asent);
-odrpacket * createRREPMessage (char *srcIP, char *destIP, int sport, int dport, int bid, int hop, int flag);
-odrpacket * createDataMessage (char *srcIP, char *destIP, int sport, int dport, int bid, int hop, char *msg);
-  */      
+        rtabentry *route;
+        route = (rtabentry *)routing_table_lookup(destip, msgdata.rediscflag);
+        if (route == NULL)
+        {
+                /*  No Entry in the Routing table for matching destination or entry is stale. Create and send RREQ Packet */
+                bid = broadcast_id++;   
+                flag = msgdata.rediscflag;
+                asent = 0;      /* TODO : Check for already sent flag */
+                packet = createRREQMessage (srcip, destip, sport, dport, bid, hop, flag, asent);
+                /* TODO : Flood REP Logic */
+        }
+        else
+        {
+                /*  Entry found in the Routing table for matching destination. Create and send DATA Packet. */
+                strncpy(msg, msgdata.msg, DATA_SIZE);
+                packet = createDataMessage (srcip, destip, sport, dport, hop, msg);
+                ifaceidx = route->ifaceIdx;
+                strncpy(src_mac, get_interface_mac(route->ifaceIdx), MAC_SIZE);
+                strncpy(dst_mac, route->next_hop_MAC, MAC_SIZE);
+                sendODR(pfsockfd, packet, src_mac, dst_mac, ifaceidx);
+        }
+        
+}
+
+char * get_interface_mac(int ifaceIdx)
+{
+        ifaceInfo *temp = iface;
+
+        if (temp == NULL)
+                return NULL;
+        
+        while (temp != NULL)
+        {
+                if (temp->ifaceIdx == ifaceIdx)
+                {
+                        return temp->haddr;
+                }
+                temp = temp->next;
+        }
+        return NULL;
 }
 
 /* Deleting an entry from linkedlist*/
@@ -523,7 +559,7 @@ odrpacket * createRREQMessage (char *srcIP, char *destIP, int sport, int dport, 
 }
 
 /* Create RREP Message          */
-odrpacket * createRREPMessage (char *srcIP, char *destIP, int sport, int dport, int bid, int hop, int flag)
+odrpacket * createRREPMessage (char *srcIP, char *destIP, int sport, int dport, int hop, int flag)
 {
         odrpacket *packet = (odrpacket *)malloc(sizeof(odrpacket));
 
@@ -531,7 +567,6 @@ odrpacket * createRREPMessage (char *srcIP, char *destIP, int sport, int dport, 
         packet->src_port        =     htonl(sport);
         packet->dest_port       =     htonl(dport);
         packet->hopcount        =     htonl(hop);
-        packet->broadcastid     =     htonl(bid);
         packet->route_discovery =     htonl(flag);
         strcpy(packet->src_ip, srcIP);
         strcpy(packet->dst_ip, destIP);
@@ -540,7 +575,7 @@ odrpacket * createRREPMessage (char *srcIP, char *destIP, int sport, int dport, 
 }
 
 /* Create DATA Message          */
-odrpacket * createDataMessage (char *srcIP, char *destIP, int bid, int sport, int dport, int hop, char *msg)
+odrpacket * createDataMessage (char *srcIP, char *destIP, int sport, int dport, int hop, char *msg)
 {
         odrpacket *packet = (odrpacket *)malloc(sizeof(odrpacket));
 
@@ -548,7 +583,6 @@ odrpacket * createDataMessage (char *srcIP, char *destIP, int bid, int sport, in
         packet->src_port        =     htonl(sport);
         packet->dest_port       =     htonl(dport);
         packet->hopcount        =     htonl(hop);
-        packet->broadcastid     =     htonl(bid);
         strcpy(packet->src_ip, srcIP);
         strcpy(packet->dst_ip, destIP);
         strcpy(packet->datamsg, msg);
@@ -609,7 +643,7 @@ void add_routing_entry(char *destIP, char *next_hop_MAC, int ifaceIdx, int hopco
 }
 
 /* Lookup in routing table */
-rtabentry *routing_table_lookup(char *destIP, int disc_flag)
+rtabentry * routing_table_lookup(char *destIP, int disc_flag)
 {
     rtabentry *temp = routinghead;
 

@@ -99,8 +99,13 @@ void client_server_same_vm(int uxsockfd, int pfsockfd, msend *msgdata, struct so
 
 void sendODR(int sockfd, odrpacket *packet, char *src_mac, char *dst_mac, int ifaceidx);
 odrpacket * createRREQMessage (char *srcIP, char *destIP, int sport, int dport, int bid, int hop, int flag, int asent);
-odrpacket * createRREPMessage (char *srcIP, char *destIP, int sport, int dport, int bid, int hop, int flag);
-odrpacket * createDataMessage (char *srcIP, char *destIP, int sport, int dport, int bid, int hop, char *msg);
+odrpacket * createRREPMessage (char *srcIP, char *destIP, int sport, int dport, int hop, int flag);
+odrpacket * createDataMessage (char *srcIP, char *destIP, int sport, int dport, int hop, char *msg);
+
+void delete_routing_entry(char *destIP);
+void add_routing_entry(char *destIP, char *next_hop_MAC, int ifaceIdx, int hopcount, int broadcastId);
+rtabentry * routing_table_lookup(char *destIP, int disc_flag);
+char * get_interface_mac(int ifaceIdx);
 
 /************************************************************************************************************************************************/
 
