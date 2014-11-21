@@ -232,23 +232,27 @@ void handleReqResp(int uxsockfd, int pfsockfd)
 
 void handleUnixSocketInfofromClientServer(int uxsockfd, int pfsockfd)
 {
-        msend msgdata;
         char msg_stream[DATA_SIZE];
-
-        odrpacket *packet;
         char src_mac[MAC_SIZE], dst_mac[MAC_SIZE], msg[DATA_SIZE], srcip[IP_SIZE], destip[IP_SIZE];
         int sport = 0, dport = 0, hop = 0, ifaceidx = 0, bid = 0, flag = 0, asent = 0;
+
+        msend msgdata;
+        odrpacket *packet;
+        rtabentry *route;
 
         struct sockaddr_un saddr;
         int size = sizeof(saddr);
         port_spath_map *sunpathinfo;
 
-        bzero (&packet, sizeof(odrpacket));
+//        bzero (packet, sizeof(odrpacket));
         bzero (&msgdata, sizeof(msend));
-
+        
+        printf("Hello 1. \n");
         recvfrom(uxsockfd, msg_stream, DATA_SIZE, 0, (struct sockaddr *)&saddr, &size);
+        printf("Hello 2. \n");
 
         convertstreamtosendpacket(&msgdata, msg_stream);
+        printf("Hello 3. \n");
 
         if (strcmp(msgdata.destIP, canonicalIP) == 0)
         {
@@ -259,12 +263,15 @@ void handleUnixSocketInfofromClientServer(int uxsockfd, int pfsockfd)
 
         if (!strcmp(saddr.sun_path, SERV_SUN_PATH))
         {
+                printf("Hello 4. \n");
+
                 gethostname(hostname, sizeof(hostname));
                 printf("\nTime packet from server at %s", hostname);
                 sport = SERV_PORT_NO;
         }
         else
         {
+                printf("Hello 5. \n");
                 gethostname(hostname, sizeof(hostname));
                 printf("\nTime Request packet from client at %s", hostname);
                 sunpathinfo = sunpath_lookup(saddr.sun_path);
@@ -287,28 +294,33 @@ void handleUnixSocketInfofromClientServer(int uxsockfd, int pfsockfd)
         dport = msgdata.destportno;
         hop = 0;
         
-        rtabentry *route;
-        route = (rtabentry *)routing_table_lookup(destip, msgdata.rediscflag);
-        if (route == NULL)
+        route = routing_table_lookup(destip, msgdata.rediscflag);
+        if (route != NULL)
         {
                 /*  No Entry in the Routing table for matching destination or entry is stale. Create and send RREQ Packet */
+                printf("\nNo Routing Table Entry. Broadcasting RREQ's to all interfaces.\n");
                 bid = broadcast_id++;   
                 flag = msgdata.rediscflag;
                 asent = 0;      /* TODO : Check for already sent flag */
                 packet = createRREQMessage (srcip, destip, sport, dport, bid, hop, flag, asent);
+                ifaceidx = -1;
                 /* TODO : Flood REP Logic */
+                RREQ_broadcast(pfsockfd, packet, ifaceidx);
         }
         else
         {
                 /*  Entry found in the Routing table for matching destination. Create and send DATA Packet. */
+                printf("\nRouting Table Entry Found. Sending Data Packet.\n");
                 strncpy(msg, msgdata.msg, DATA_SIZE);
                 packet = createDataMessage (srcip, destip, sport, dport, hop, msg);
-                ifaceidx = route->ifaceIdx;
-                strncpy(src_mac, get_interface_mac(route->ifaceIdx), MAC_SIZE);
-                strncpy(dst_mac, route->next_hop_MAC, MAC_SIZE);
+                ifaceidx = 3;
+	        char src_mac[6]  = {0x00, 0x0c, 0x29, 0xd9, 0x08, 0xF6};
+	        char dst_mac[6]  = {0x00, 0x0c, 0x29, 0x49, 0x3F, 0x65};
+        //        ifaceidx = route->ifaceIdx;
+        //        strncpy(src_mac, get_interface_mac(route->ifaceIdx), MAC_SIZE);
+        //        strncpy(dst_mac, route->next_hop_MAC, MAC_SIZE);
                 sendODR(pfsockfd, packet, src_mac, dst_mac, ifaceidx);
         }
-        
 }
 
 char * get_interface_mac(int ifaceIdx)

@@ -106,6 +106,7 @@ void delete_routing_entry(char *destIP);
 void add_routing_entry(char *destIP, char *next_hop_MAC, int ifaceIdx, int hopcount, int broadcastId);
 rtabentry * routing_table_lookup(char *destIP, int disc_flag);
 char * get_interface_mac(int ifaceIdx);
+void RREQ_broadcast(int sockfd, odrpacket *pack, int ifaceIdx);
 
 /************************************************************************************************************************************************/
 
