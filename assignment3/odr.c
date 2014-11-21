@@ -10,7 +10,8 @@ char hostname[STR_SIZE];
 ifaceInfo *iface = NULL;
 port_spath_map *portsunhead = NULL;
 int max_port = CLI_PORT;
-int staleness_parameter = 5;
+long staleness_parameter = 5;
+rtabentry *routinghead = NULL;
 
 /* Pre defined functions given to read all interfaces and their IP and MAC addresses */
 char* readInterfaces()
@@ -539,6 +540,82 @@ odrpacket * createDataMessage (char *srcIP, char *destIP, int bid, int sport, in
         strcpy(packet->datamsg, msg);
 
         return packet;
+}
+
+/* Deleting an entry from routing table linkedlist*/
+void delete_routing_entry(char *destIP)
+{
+        rtabentry *temp = routinghead;
+                if((strcmp(temp->destIP, destIP)==0))
+                {
+                        routinghead = routinghead->next;
+                        return;
+                }
+                else
+                {
+                        while(temp)
+                        {
+                                if((strcmp(temp->next->destIP, destIP)==0))
+                                {
+                                        temp->next = temp->next->next;
+                                        return;
+                                }
+                                temp = temp->next;
+                        }
+                }
+}
+
+/* Insert new entry to routing table */
+void add_routing_entry(char *destIP, char *next_hop_MAC, int ifaceIdx, int hopcount, int broadcastId)
+{
+    rtabentry *newentry = (rtabentry *)malloc(sizeof(rtabentry));
+
+    newentry->ifaceIdx = ifaceIdx;
+    strcpy(newentry->destIP, destIP);
+    strcpy(newentry->next_hop_MAC, next_hop_MAC);
+    newentry->hopcount = hopcount;
+    newentry->broadcastId = broadcastId;
+    
+    /* Get Current time stamp */
+
+    struct timeval current_time;
+    gettimeofday(&current_time, NULL);
+
+    newentry->ts = current_time;
+    newentry->next = NULL;
+
+    /* Insert new entry to linked list */
+    if (routinghead == NULL)
+        routinghead = newentry;
+    else
+        {
+            newentry->next = routinghead;
+            routinghead = newentry;
+        }
+}
+
+/* Lookup in routing table */
+rtabentry *routing_table_lookup(char *destIP, int disc_flag)
+{
+    rtabentry *temp = routinghead;
+
+    while (temp)
+    {
+        if(strcmp(temp->destIP, destIP)==0)
+        {
+                if ((isStale(temp->ts)) || (disc_flag == 1))
+                {
+                        delete_routing_entry(temp->destIP);
+                        return NULL;
+                }
+                else
+                {
+                        return temp;
+                }
+        }
+        temp = temp->next;
+     }
+    return temp;
 }
 
 int main (int argc, char **argv)
