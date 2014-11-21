@@ -419,6 +419,19 @@ port_spath_map * port_lookup(int port)
         return temp;
 }
 
+void RREQ_broadcast(int sockfd, odrpacket *pack, int ifaceIdx)
+{
+	char dst_mac[6]  = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+	ifaceInfo *temp = iface;
+	while(temp){
+		if(temp->ifaceIdx == ifaceIdx)
+		{
+			continue;
+		}
+		sendODR(sockfd, pack, temp->haddr, dst_mac, ifaceIdx);
+		temp = temp->next;
+	}
+}
 
 /* Handle Client and Server Communication on same node */
 
@@ -664,6 +677,26 @@ rtabentry * routing_table_lookup(char *destIP, int disc_flag)
         temp = temp->next;
      }
     return temp;
+}
+
+void print_routingtable()
+{	
+	char destIP[IP_SIZE];
+    char next_hop_MAC[MAC_SIZE];
+    int ifaceIdx;
+    int hopcount;
+    int broadcastId;
+    struct timeval ts;
+	printf("\n|-----------------------------------------------------------------------------------------------------------|\n");
+	printf("\n| -- DestIP -- | -- Next-hop MAC -- | -- IfaceIDx -- | -- Hopcount -- | -- BroadcastID -- | -- timestamp -- |\n");
+	printf("\n|-----------------------------------------------------------------------------------------------------------|\n");
+	rtabentry *temp = routinghead;
+	while(temp)
+	{
+		printf("\n| -- %s -- | -- %s -- | -- %d -- | -- %d -- | -- %d -- | -- %ld -- |\n", temp->destIP, temp->next_hop_MAC,
+			 temp->ifaceIdx, temp->hopcount, temp->broadcastId, (long)temp->ts.tv_sec);
+
+	}
 }
 
 int main (int argc, char **argv)
