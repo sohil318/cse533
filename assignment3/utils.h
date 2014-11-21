@@ -3,7 +3,7 @@
 
 #include    "unp.h"
 #define     IP_SIZE     16
-#define     TS_SIZE     512
+#define     TS_SIZE     1440
 
 typedef struct msg_send_packet
 {
@@ -23,6 +23,7 @@ typedef struct msg_recv_packet
 int msg_send(int sockfd, char *ip_dest, int dest_port, char *msg, int flag);
 int msg_recv(int sockfd, mrecv * recv_p, struct sockaddr_un *addr);  
 void convertstreamtosendpacket(msend *msgdata, char* msg_stream);
+
 
 #endif  /* __UTILS_h */
 

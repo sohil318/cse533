@@ -97,6 +97,11 @@ port_spath_map * sunpath_lookup(char *sun_path);
 port_spath_map * port_lookup(int port);
 void client_server_same_vm(int uxsockfd, int pfsockfd, msend *msgdata, struct sockaddr_un *saddr);
 
+void sendODR(int sockfd, odrpacket *packet, char *src_mac, char *dst_mac, int ifaceidx);
+odrpacket * createRREQMessage (char *srcIP, char *destIP, int sport, int dport, int bid, int hop, int flag, int asent);
+odrpacket * createRREPMessage (char *srcIP, char *destIP, int sport, int dport, int bid, int hop, int flag);
+odrpacket * createDataMessage (char *srcIP, char *destIP, int sport, int dport, int bid, int hop, char *msg);
+
 /************************************************************************************************************************************************/
 
 #endif  /* __odr_h */
