@@ -295,7 +295,7 @@ void handleUnixSocketInfofromClientServer(int uxsockfd, int pfsockfd)
         hop = 0;
         
         route = routing_table_lookup(destip, msgdata.rediscflag);
-        if (route != NULL)
+        if (route == NULL)
         {
                 /*  No Entry in the Routing table for matching destination or entry is stale. Create and send RREQ Packet */
                 printf("\nNo Routing Table Entry. Broadcasting RREQ's to all interfaces.\n");
@@ -440,7 +440,7 @@ void RREQ_broadcast(int sockfd, odrpacket *pack, int ifaceIdx)
 		{
 			continue;
 		}
-		sendODR(sockfd, pack, temp->haddr, dst_mac, ifaceIdx);
+		sendODR(sockfd, pack, temp->haddr, dst_mac, temp->ifaceIdx);
 		temp = temp->next;
 	}
 }
@@ -541,6 +541,8 @@ void handlePFPacketSocketInfofromOtherODR(int uxsockfd, int pfsockfd)
         }
 }
 
+/* Extract ODR Packet from Ethernet Frame . Convert it back from network to host long address.  */
+
 odrpacket * getODRPacketfromEthernetPacket(char *ether_frame)
 {
         printf("\nGet Packet from Ethernet Frame");
@@ -577,13 +579,81 @@ odrpacket * getODRPacketfromEthernetPacket(char *ether_frame)
 
 void handleRREQPacket(int pfsockfd, char * src_mac, char * dst_mac, odrpacket * packet, int ifaceidx)
 {
-        printf("\nRREQ");
-}
-void handleRREPPacket(int pfsockfd, char * src_mac, char * dst_mac, odrpacket * packet, int ifaceidx)
-{
-        printf("\nRREP");
+//        printf("\nRREQ");
+        int hop, redisc_flag;
+        rtabentry * route;
+	odrpacket * req_packet, *rep_packet;
+//        int dup_rreq = checkDupPacket(packet->src_ip, packet->broadcastid); /* TODO : Check for duplicate RREQ. Stop Flooding */
+
+        int entry = add_routing_entry(packet->src_ip, src_mac, ifaceidx, packet->hopcount, packet->broadcastid);
+
+	if (strcmp(packet->dst_ip, canonicalIP) == 0)
+	{	
+                /* RREQ reached  dest ip. Now create and send the response RREP back. */
+		route = routing_table_lookup(packet->src_ip, 0);
+		hop             =       0;
+                redisc_flag     =       0;
+
+                /* Create a response RREP packet and send as ODR Frame . TODO : Add condition for asent Flag and Duplicate RReq */
+                
+                rep_packet = createRREPMessage(packet->dst_ip, packet->src_ip, packet->dest_port, packet->src_port, hop, redisc_flag);
+		sendODR(pfsockfd, rep_packet, get_interface_mac(route->ifaceIdx), route->next_hop_MAC , route->ifaceIdx); //using get_interface_mac fresh entry
+	}
+	else
+	{	
+                /* RREQ forwarded when dest ip is not matched with Canonical IP of current VM */
+		route = routing_table_lookup(packet->dst_ip, packet->route_discovery);	/*assuming there is an entry in rtable TODO otherwise */
+		
+                /* No route found to destination or rediscovery flag = 1. Continue Flooding */
+                if (route == NULL)
+                {
+                        packet = createRREQMessage (packet->src_ip, packet->dst_ip, packet->src_port, packet->dest_port, packet->broadcastid, packet->hopcount + 1, packet->route_discovery, packet->rep_already_sent);
+                        RREQ_broadcast(pfsockfd, req_packet, ifaceidx);                               
+                }
+                else    /* Route to destination exists in Routing Table, Check for new src_ip. If yes, set asent = 1 and continue flooding. */
+                {
+                        //if (route->srcIP
+                        rep_packet = createRREPMessage(packet->dst_ip, packet->src_ip, packet->dest_port, packet->src_port, route->hopcount, 0);
+		        sendODR(pfsockfd, rep_packet, get_interface_mac(route->ifaceIdx), route->next_hop_MAC , route->ifaceIdx); //using get_interface_mac fresh entry
+
+                }
+
+                packet->hopcount++;
+                /* Packet updates HOP Count and converts to htonl format */
+                rep_packet = createRREPMessage(packet->src_ip, packet->dst_ip, packet->src_port, packet->dest_port, packet->hopcount, packet->route_discovery);
+		sendODR(pfsockfd, rep_packet, get_interface_mac(route->ifaceIdx), route->next_hop_MAC, route->ifaceIdx);
+	}
 
 }
+
+/* Handle incoming responses through PF_PACKET socket. */
+
+void handleRREPPacket(int pfsockfd, char * src_mac, char * dst_mac, odrpacket * packet, int ifaceidx)
+{
+//        printf("\nRREP");
+        rtabentry * route;
+	odrpacket * datapacket, *rep_packet;
+        add_routing_entry(packet->src_ip, src_mac, ifaceidx, packet->hopcount, 0);
+
+	if (strcmp(packet->dst_ip, canonicalIP) == 0)
+	{	
+                /* RREP reached  dest ip. Now send the data request from server. TODO : Park client req in queue and Read from the queue. */
+		route = routing_table_lookup(packet->src_ip, 0);
+		char *msg = "Time request";
+		datapacket = createDataMessage (packet->dst_ip, packet->src_ip, packet->dest_port, packet->src_port, 0, msg);	
+		sendODR(pfsockfd, datapacket, get_interface_mac(route->ifaceIdx), route->next_hop_MAC , route->ifaceIdx); //using get_interface_mac fresh entry
+	}
+	else
+	{	
+                /* RREP forwarded when dest ip is not matched with Canonical IP of current VM */
+		route = routing_table_lookup(packet->dst_ip,0);	/*assuming there is an entry in rtable TODO otherwise */
+		packet->hopcount++;
+                /* Packet updates HOP Count and converts to htonl format */
+                rep_packet = createRREPMessage(packet->src_ip, packet->dst_ip, packet->src_port, packet->dest_port, packet->hopcount, packet->route_discovery);
+		sendODR(pfsockfd, rep_packet, get_interface_mac(route->ifaceIdx), route->next_hop_MAC, route->ifaceIdx);
+	}
+}
+
 void handleDATAPacket(int uxsockfd, char * src_mac, char * dst_mac, odrpacket * packet, int ifaceidx)
 {
         printf("\nDATA");
@@ -642,7 +712,6 @@ void sendODR(int sockfd, odrpacket *packet, char *src_mac, char *dst_mac, int if
                 perror("sendto");
         }
 }
-
 
 /* Create RREQ Message          */
 
@@ -719,7 +788,9 @@ void delete_routing_entry(char *destIP)
 }
 
 /* Insert new entry to routing table */
-void add_routing_entry(char *destIP, char *next_hop_MAC, int ifaceIdx, int hopcount, int broadcastId)
+
+/* TODO : Handle all types of addtion/updates to routing table. Return 1 for success and 0 otherwise. */
+int add_routing_entry(char *destIP, char *next_hop_MAC, int ifaceIdx, int hopcount, int broadcastId)
 {
     rtabentry *newentry = (rtabentry *)malloc(sizeof(rtabentry));
 
@@ -746,6 +817,16 @@ void add_routing_entry(char *destIP, char *next_hop_MAC, int ifaceIdx, int hopco
             routinghead = newentry;
         }
 }
+
+/* Updating the timestamp of the routing table entry */
+void update_routing_entry_ts(rtabentry *update)
+{
+    struct timeval current_time;
+    gettimeofday(&current_time, NULL);
+
+    update->ts = current_time;
+}
+
 
 /* Lookup in routing table */
 rtabentry * routing_table_lookup(char *destIP, int disc_flag)
@@ -787,7 +868,6 @@ void print_routingtable()
         {
                 printf("\n| -- %s -- | -- %s -- | -- %d -- | -- %d -- | -- %d -- | -- %ld -- |\n", temp->destIP, temp->next_hop_MAC,
                                 temp->ifaceIdx, temp->hopcount, temp->broadcastId, (long)temp->ts.tv_sec);
-
         }
 }
 
