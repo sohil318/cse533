@@ -296,7 +296,7 @@ void handleUnixSocketInfofromClientServer(int uxsockfd, int pfsockfd)
         hop = 0;
         
         route = routing_table_lookup(destip, msgdata.rediscflag);
-        if (route != NULL)
+        if (route == NULL)
         {
                 /*  No Entry in the Routing table for matching destination or entry is stale. Create and send RREQ Packet */
                 printf("\nNo Routing Table Entry. Broadcasting RREQ's to all interfaces.\n");
@@ -441,7 +441,7 @@ void RREQ_broadcast(int sockfd, odrpacket *pack, int ifaceIdx)
 		{
 			continue;
 		}
-		sendODR(sockfd, pack, temp->haddr, dst_mac, ifaceIdx);
+		sendODR(sockfd, pack, temp->haddr, dst_mac, temp->ifaceIdx);
 		temp = temp->next;
 	}
 }
@@ -693,14 +693,7 @@ rtabentry * routing_table_lookup(char *destIP, int disc_flag)
 }
 
 void print_routingtable()
-{	
-	char destIP[IP_SIZE];
-    char next_hop_MAC[MAC_SIZE];
-    int ifaceIdx;
-    int hopcount;
-    int broadcastId;
-    struct timeval ts;
-	printf("\n|-----------------------------------------------------------------------------------------------------------|\n");
+{	printf("\n|-----------------------------------------------------------------------------------------------------------|\n");
 	printf("\n| -- DestIP -- | -- Next-hop MAC -- | -- IfaceIDx -- | -- Hopcount -- | -- BroadcastID -- | -- timestamp -- |\n");
 	printf("\n|-----------------------------------------------------------------------------------------------------------|\n");
 	rtabentry *temp = routinghead;
