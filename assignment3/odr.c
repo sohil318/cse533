@@ -564,6 +564,24 @@ void sendODR(int sockfd, odrpacket *packet, char *src_mac, char *dst_mac, int if
 
 }
 
+void handleRREP(int sockfd, char *srcMAC, char *destMAC, odrpacket *pack, int ifaceIdx)
+{
+	add_routing_entry(pack->src_ip, srcMAC, ifaceIdx, pack->hopcount,0);
+	if(pack->dst_ip == canonicalIP)
+	{	
+		rtabentry *route = routing_table_lookup(pack->src_ip, 0);
+		char *msg = "Time request";
+		odrpacket * dataPacket = createDataMessage (pack->dst_ip, pack->src_ip, pack->dest_port, pack->src_port, 0, msg);	
+		sendODR(sockfd, dataPacket, get_interface_mac(route->ifaceIdx), route->next_hop_MAC , route->ifaceIdx); //using get_interface_mac fresh entry
+	}
+	else
+	{	
+		rtabentry *entry = routing_table_lookup(pack->src_ip,0);	/*assuming there is an entry in rtable TODO otherwise */
+		pack->hopcount++;
+		sendODR(sockfd, pack, get_interface_mac(entry->ifaceIdx), entry->next_hop_MAC ,entry->ifaceIdx);
+	}
+}
+
 
 /* Create RREQ Message          */
 
@@ -667,6 +685,16 @@ void add_routing_entry(char *destIP, char *next_hop_MAC, int ifaceIdx, int hopco
             routinghead = newentry;
         }
 }
+
+/* Updating the timestamp of the routing table entry */
+void update_routing_entry_ts(rtabentry *update)
+{
+    struct timeval current_time;
+    gettimeofday(&current_time, NULL);
+
+    update->ts = current_time;
+}
+
 
 /* Lookup in routing table */
 rtabentry * routing_table_lookup(char *destIP, int disc_flag)
