@@ -223,7 +223,6 @@ void handleReqResp(int uxsockfd, int pfsockfd)
                 else if ( FD_ISSET(pfsockfd, &rset))
                 {
                         /* Check for ODR sending messages to other VM's in ODR layer */
-                        /* TODO : Shipra Start here */
                         handlePFPacketSocketInfofromOtherODR(uxsockfd, pfsockfd);
                 }
         }
@@ -248,12 +247,12 @@ void handleUnixSocketInfofromClientServer(int uxsockfd, int pfsockfd)
 //        bzero (packet, sizeof(odrpacket));
         bzero (&msgdata, sizeof(msend));
         
-        printf("Hello 1. \n");
+//        printf("Hello 1. \n");
         recvfrom(uxsockfd, msg_stream, DATA_SIZE, 0, (struct sockaddr *)&saddr, &size);
-        printf("Hello 2. \n");
+//        printf("Hello 2. \n");
 
         convertstreamtosendpacket(&msgdata, msg_stream);
-        printf("Hello 3. \n");
+//        printf("Hello 3. \n");
 
         if (strcmp(msgdata.destIP, canonicalIP) == 0)
         {
@@ -507,7 +506,88 @@ void client_server_same_vm(int uxsockfd, int pfsockfd, msend *msgdata, struct so
 
 void handlePFPacketSocketInfofromOtherODR(int uxsockfd, int pfsockfd)
 {
-        printf("\nTODO");
+        //printf("\nTODO");
+        struct sockaddr_ll saddr;
+        char src_mac[MAC_SIZE], dst_mac[MAC_SIZE], ether_frame [ETHR_FRAME_LEN];
+        int len, ifaceidx;
+        len = sizeof(saddr);
+        odrpacket *packet;
+        rtabentry *route;
+
+        recvfrom(pfsockfd, ether_frame, ETHR_FRAME_LEN, 0, (SA *)&saddr, &len);
+        
+        packet = getODRPacketfromEthernetPacket(ether_frame);
+        strncpy(src_mac, ether_frame, MAC_SIZE);
+        strncpy(dst_mac, ether_frame + MAC_SIZE, MAC_SIZE);
+        ifaceidx = saddr.sll_ifindex;
+        
+        if (packet->packet_type == 1)
+        {
+                gethostname(hostname, sizeof(hostname));
+                printf("\nIncoming RREQ from %s on vm = %s", src_mac, hostname);
+                handleRREQPacket(pfsockfd, src_mac, dst_mac, packet, ifaceidx);
+        }
+        else if (packet->packet_type == 2)
+        {
+                gethostname(hostname, sizeof(hostname));
+                printf("\nIncoming RREP from %s on vm = %s", src_mac, hostname);
+                handleRREPPacket(pfsockfd, src_mac, dst_mac, packet, ifaceidx);
+        }
+        else if (packet->packet_type == DATA)
+        {
+                gethostname(hostname, sizeof(hostname));
+                printf("\nIncoming DATA from %s on vm = %s", src_mac, hostname);
+                handleDATAPacket(uxsockfd, src_mac, dst_mac, packet, ifaceidx);
+        }
+}
+
+odrpacket * getODRPacketfromEthernetPacket(char *ether_frame)
+{
+        printf("\nGet Packet from Ethernet Frame");
+        odrpacket * packet;
+        
+        unsigned char * odrpackethead = ether_frame + 14;
+        packet = (odrpacket *)odrpackethead;
+        
+
+        /* Reverse back to Host Long Order */
+        packet->packet_type       =       ntohl(packet->packet_type);
+        packet->src_port          =       ntohl(packet->src_port);
+        packet->dest_port         =       ntohl(packet->dest_port);
+        packet->hopcount          =       ntohl(packet->hopcount);
+
+        if (packet->packet_type == RREQ)
+        {
+        
+        packet->broadcastid       =       ntohl(packet->broadcastid);
+        packet->route_discovery   =       ntohl(packet->route_discovery);
+        packet->rep_already_sent  =       ntohl(packet->rep_already_sent);
+        
+        }
+
+        else if (packet->packet_type == RREP)
+        {
+        
+        packet->route_discovery   =       ntohl(packet->route_discovery);
+        
+        }
+        
+        return packet;
+}
+
+void handleRREQPacket(int pfsockfd, char * src_mac, char * dst_mac, odrpacket * packet, int ifaceidx)
+{
+        printf("\nRREQ");
+}
+void handleRREPPacket(int pfsockfd, char * src_mac, char * dst_mac, odrpacket * packet, int ifaceidx)
+{
+        printf("\nRREP");
+
+}
+void handleDATAPacket(int uxsockfd, char * src_mac, char * dst_mac, odrpacket * packet, int ifaceidx)
+{
+        printf("\nDATA");
+
 }
 
 /*  Complete ODR Frame  REF ==> http://aschauf.landshut.org/fh/linux/udp_vs_raw/ch01s03.html   */
@@ -525,7 +605,7 @@ void sendODR(int sockfd, odrpacket *packet, char *src_mac, char *dst_mac, int if
 
         /*      Prepare sockaddr_ll     */
         socket_address.sll_family   =   PF_PACKET;                      /*      RAW communication                               */  
-        socket_address.sll_protocol =   htons(ETH_P_IP);                /*      We don't use a protocoll above ethernet layer just use anything here.  */
+        socket_address.sll_protocol =   htons(MY_PROTOCOL);                /*      We don't use a protocoll above ethernet layer just use anything here.  */
         socket_address.sll_ifindex  =   ifaceidx;                       /*      Interface Index of the network device in function parameter     */
 
         
@@ -561,7 +641,6 @@ void sendODR(int sockfd, odrpacket *packet, char *src_mac, char *dst_mac, int if
                 printf("\nError in Sending ODR");
                 perror("sendto");
         }
-
 }
 
 
@@ -694,22 +773,22 @@ rtabentry * routing_table_lookup(char *destIP, int disc_flag)
 
 void print_routingtable()
 {	
-	char destIP[IP_SIZE];
-    char next_hop_MAC[MAC_SIZE];
-    int ifaceIdx;
-    int hopcount;
-    int broadcastId;
-    struct timeval ts;
-	printf("\n|-----------------------------------------------------------------------------------------------------------|\n");
-	printf("\n| -- DestIP -- | -- Next-hop MAC -- | -- IfaceIDx -- | -- Hopcount -- | -- BroadcastID -- | -- timestamp -- |\n");
-	printf("\n|-----------------------------------------------------------------------------------------------------------|\n");
-	rtabentry *temp = routinghead;
-	while(temp)
-	{
-		printf("\n| -- %s -- | -- %s -- | -- %d -- | -- %d -- | -- %d -- | -- %ld -- |\n", temp->destIP, temp->next_hop_MAC,
-			 temp->ifaceIdx, temp->hopcount, temp->broadcastId, (long)temp->ts.tv_sec);
+        char destIP[IP_SIZE];
+        char next_hop_MAC[MAC_SIZE];
+        int ifaceIdx;
+        int hopcount;
+        int broadcastId;
+        struct timeval ts;
+        printf("\n|-----------------------------------------------------------------------------------------------------------|\n");
+        printf("\n| -- DestIP -- | -- Next-hop MAC -- | -- IfaceIDx -- | -- Hopcount -- | -- BroadcastID -- | -- timestamp -- |\n");
+        printf("\n|-----------------------------------------------------------------------------------------------------------|\n");
+        rtabentry *temp = routinghead;
+        while(temp)
+        {
+                printf("\n| -- %s -- | -- %s -- | -- %d -- | -- %d -- | -- %d -- | -- %ld -- |\n", temp->destIP, temp->next_hop_MAC,
+                                temp->ifaceIdx, temp->hopcount, temp->broadcastId, (long)temp->ts.tv_sec);
 
-	}
+        }
 }
 
 int main (int argc, char **argv)

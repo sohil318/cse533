@@ -107,6 +107,10 @@ void add_routing_entry(char *destIP, char *next_hop_MAC, int ifaceIdx, int hopco
 rtabentry * routing_table_lookup(char *destIP, int disc_flag);
 char * get_interface_mac(int ifaceIdx);
 void RREQ_broadcast(int sockfd, odrpacket *pack, int ifaceIdx);
+odrpacket * getODRPacketfromEthernetPacket(char *ether_frame);
+void handleRREQPacket(int pfsockfd, char * src_mac, char * dst_mac, odrpacket * packet, int ifaceidx);
+void handleRREPPacket(int pfsockfd, char * src_mac, char * dst_mac, odrpacket * packet, int ifaceidx);
+void handleDATAPacket(int uxsockfd, char * src_mac, char * dst_mac, odrpacket * packet, int ifaceidx);
 
 /************************************************************************************************************************************************/
 
