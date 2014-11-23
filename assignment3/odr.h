@@ -82,35 +82,40 @@ typedef struct ODRpacket    {
 /************************************************************************************************************************************************/
 
 char* readInterfaces();
-void addInterfaceList(int idx, char *name, char *ip_addr, char *haddr);
 void print_interfaceInfo ();
+void addInterfaceList(int idx, char *name, char *ip_addr, char *haddr);
+
+void delete_entry(int port);
 void add_sunpath_port_info( char *sunpath, int port);
 void print_sunpath_port_map ();
+port_spath_map * sunpath_lookup(char *sun_path);
+port_spath_map * port_lookup(int port);
+
 int createUXpacket(int family, int type, int protocol);
 int createPFpacket(int family, int type, int protocol);
 
-int BindUnixSocket(struct sockaddr_un *servAddr, char *sun_path, int uxsockfd);
+int isStale(struct timeval ts);
+char * get_interface_mac(int ifaceIdx);
 void handleReqResp(int uxsockfd, int pfsockfd);
 void handleUnixSocketInfofromClientServer(int uxsockfd, int pfsockfd);
 void handlePFPacketSocketInfofromOtherODR(int uxsockfd, int pfsockfd);
-port_spath_map * sunpath_lookup(char *sun_path);
-port_spath_map * port_lookup(int port);
 void client_server_same_vm(int uxsockfd, int pfsockfd, msend *msgdata, struct sockaddr_un *saddr);
 
-void sendODR(int sockfd, odrpacket *packet, char *src_mac, char *dst_mac, int ifaceidx);
+odrpacket * getODRPacketfromEthernetPacket(char *ether_frame);
 odrpacket * createRREQMessage (char *srcIP, char *destIP, int sport, int dport, int bid, int hop, int flag, int asent);
 odrpacket * createRREPMessage (char *srcIP, char *destIP, int sport, int dport, int hop, int flag);
 odrpacket * createDataMessage (char *srcIP, char *destIP, int sport, int dport, int hop, char *msg);
-
-void delete_routing_entry(char *destIP);
-int add_routing_entry(int packet_type, char *destIP, char *next_hop_MAC, int ifaceIdx, int hopcount, int broadcastId, int rdiscflag);
-rtabentry * routing_table_lookup(char *destIP, int disc_flag);
-char * get_interface_mac(int ifaceIdx);
-void RREQ_broadcast(int sockfd, odrpacket *pack, int ifaceIdx);
-odrpacket * getODRPacketfromEthernetPacket(char *ether_frame);
 void handleRREQPacket(int pfsockfd, char * src_mac, char * dst_mac, odrpacket * packet, int ifaceidx);
 void handleRREPPacket(int pfsockfd, char * src_mac, char * dst_mac, odrpacket * packet, int ifaceidx);
 void handleDATAPacket(int uxsockfd, int pfsockfd, char * src_mac, char * dst_mac, odrpacket * packet, int ifaceidx);
+void sendODR(int sockfd, odrpacket *packet, char *src_mac, char *dst_mac, int ifaceidx);
+void RREQ_broadcast(int sockfd, odrpacket *pack, int ifaceIdx);
+
+int isDuplicate(int broadcastid, char *destip);
+int add_routing_entry(int packet_type, char *destIP, char *next_hop_MAC, int ifaceIdx, int hopcount, int broadcastId, int rdisc);
+void update_routing_entry_ts(rtabentry *update);
+rtabentry * routing_table_lookup(char *destIP, int disc_flag);
+void print_routingtable();
 
 /************************************************************************************************************************************************/
 
