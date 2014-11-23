@@ -103,7 +103,7 @@ odrpacket * createRREPMessage (char *srcIP, char *destIP, int sport, int dport, 
 odrpacket * createDataMessage (char *srcIP, char *destIP, int sport, int dport, int hop, char *msg);
 
 void delete_routing_entry(char *destIP);
-int add_routing_entry(char *destIP, char *next_hop_MAC, int ifaceIdx, int hopcount, int broadcastId);
+int add_routing_entry(int packet_type, char *destIP, char *next_hop_MAC, int ifaceIdx, int hopcount, int broadcastId, int rdiscflag);
 rtabentry * routing_table_lookup(char *destIP, int disc_flag);
 char * get_interface_mac(int ifaceIdx);
 void RREQ_broadcast(int sockfd, odrpacket *pack, int ifaceIdx);
