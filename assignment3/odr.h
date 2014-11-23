@@ -110,7 +110,7 @@ void RREQ_broadcast(int sockfd, odrpacket *pack, int ifaceIdx);
 odrpacket * getODRPacketfromEthernetPacket(char *ether_frame);
 void handleRREQPacket(int pfsockfd, char * src_mac, char * dst_mac, odrpacket * packet, int ifaceidx);
 void handleRREPPacket(int pfsockfd, char * src_mac, char * dst_mac, odrpacket * packet, int ifaceidx);
-void handleDATAPacket(int uxsockfd, char * src_mac, char * dst_mac, odrpacket * packet, int ifaceidx);
+void handleDATAPacket(int uxsockfd, int pfsockfd, char * src_mac, char * dst_mac, odrpacket * packet, int ifaceidx);
 
 /************************************************************************************************************************************************/
 

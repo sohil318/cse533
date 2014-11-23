@@ -537,7 +537,7 @@ void handlePFPacketSocketInfofromOtherODR(int uxsockfd, int pfsockfd)
         {
                 gethostname(hostname, sizeof(hostname));
                 printf("\nIncoming DATA from %s on vm = %s", src_mac, hostname);
-                handleDATAPacket(uxsockfd, src_mac, dst_mac, packet, ifaceidx);
+                handleDATAPacket(uxsockfd, pfsockfd, src_mac, dst_mac, packet, ifaceidx);
         }
 }
 
@@ -656,10 +656,49 @@ void handleRREPPacket(int pfsockfd, char * src_mac, char * dst_mac, odrpacket * 
 	}
 }
 
-void handleDATAPacket(int uxsockfd, char * src_mac, char * dst_mac, odrpacket * packet, int ifaceidx)
+void handleDATAPacket(int uxsockfd, int pfsockfd, char * src_mac, char * dst_mac, odrpacket * packet, int ifaceidx)
 {
         printf("\nDATA");
-
+	mrecv *rec;
+	port_spath_map *port_sun;
+	struct sockaddr_un clientaddr, saddr;
+	rtabentry *route;
+	odrpacket * datapacket;
+	msend msgdata;
+	char msg_stream[MSG_STREAM_SIZE], msg_str[MSG_STREAM_SIZE];
+	bzero(&clientaddr, sizeof(struct sockaddr_un));
+	bzero(&saddr, sizeof(struct sockaddr_un));
+	if(strcmp(packet->dst_ip, canonicalIP)==0)
+	{
+		strcpy(rec->srcIP, packet->src_ip);
+		rec->srcportno = packet->src_port;
+		strcpy(rec->msg,packet->datamsg);
+		clientaddr.sun_family = AF_LOCAL;
+		port_sun = port_lookup(packet->dest_port);
+	 	strcpy(clientaddr.sun_path, port_sun->sun_path);	
+		sprintf(msg_stream, "%s;%d;%s", rec->srcIP, rec->srcportno, rec->msg);
+		sendto(uxsockfd, msg_stream, sizeof(msg_stream), 0, (struct sockaddr *)&clientaddr, (socklen_t)sizeof(clientaddr));
+		int size = sizeof(saddr);
+		if(packet->dest_port == SERV_PORT_NO)
+		{
+			bzero (&msgdata, sizeof(msend));
+			recvfrom(uxsockfd, msg_str, DATA_SIZE, 1, (struct sockaddr *)&saddr, &size);
+			convertstreamtosendpacket(&msgdata, msg_str);
+			route = routing_table_lookup(msgdata.destIP,0);
+			datapacket = createDataMessage (canonicalIP, msgdata.destIP, SERV_PORT_NO, msgdata.destportno, 0, msgdata.msg);
+                	sendODR(pfsockfd, datapacket,get_interface_mac(route->ifaceIdx), route->next_hop_MAC, route->ifaceIdx);
+		}
+		else
+		{
+			return;
+		}
+	}
+	else
+	{
+		route = routing_table_lookup(packet->dst_ip, 0);
+		datapacket = createDataMessage (packet->src_ip, packet->dst_ip, packet->src_port, packet->dest_port, packet->hopcount++, packet->datamsg);	
+		sendODR(pfsockfd, datapacket,get_interface_mac(route->ifaceIdx), route->next_hop_MAC, route->ifaceIdx);
+	}
 }
 
 /*  Complete ODR Frame  REF ==> http://aschauf.landshut.org/fh/linux/udp_vs_raw/ch01s03.html   */
