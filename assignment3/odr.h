@@ -24,8 +24,9 @@
 #define     DATA_SIZE           1440
 #define     MSG_STREAM_SIZE     1440
 
-#define     ETHR_FRAME_LEN       1514
-
+#define     ETHR_FRAME_LEN      1514
+#define     MSEND_SIZE          1464
+#define     MRECV_SIZE          1460
 
 /***********************************************************************/
 /* Interface Information structure to hold all interfaces of a machine */

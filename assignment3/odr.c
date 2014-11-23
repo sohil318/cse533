@@ -53,7 +53,7 @@ char* readInterfaces()
                 if (prflag) {
                         printf("         HW addr = ");
                         ptr = hwa->if_haddr;
-                        memcpy(hptr, hwa->if_haddr, 6);
+                        memcpy(hptr, hwa->if_haddr, MAC_SIZE);
                         i = IF_HADDR;
                         do {
                                 printf("%.2x%s", *ptr++ & 0xff, (i == 1) ? " " : ":");
@@ -313,12 +313,12 @@ void handleUnixSocketInfofromClientServer(int uxsockfd, int pfsockfd)
                 printf("\nRouting Table Entry Found. Sending Data Packet.\n");
                 strncpy(msg, msgdata.msg, DATA_SIZE);
                 packet = createDataMessage (srcip, destip, sport, dport, hop, msg);
-                ifaceidx = 3;
-	        char src_mac[6]  = {0x00, 0x0c, 0x29, 0xd9, 0x08, 0xF6};
-	        char dst_mac[6]  = {0x00, 0x0c, 0x29, 0x49, 0x3F, 0x65};
-        //        ifaceidx = route->ifaceIdx;
-        //        strncpy(src_mac, get_interface_mac(route->ifaceIdx), MAC_SIZE);
-        //        strncpy(dst_mac, route->next_hop_MAC, MAC_SIZE);
+        //        ifaceidx = 3;
+        //        char src_mac[6]  = {0x00, 0x0c, 0x29, 0xd9, 0x08, 0xF6};
+	//        char dst_mac[6]  = {0x00, 0x0c, 0x29, 0x49, 0x3F, 0x65};
+                ifaceidx = route->ifaceIdx;
+                memcpy(src_mac, get_interface_mac(route->ifaceIdx), MAC_SIZE);
+                memcpy(dst_mac, route->next_hop_MAC, MAC_SIZE);
                 sendODR(pfsockfd, packet, src_mac, dst_mac, ifaceidx);
         }
 }
@@ -435,13 +435,13 @@ void RREQ_broadcast(int sockfd, odrpacket *pack, int ifaceIdx)
 {
 	char dst_mac[6]  = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 	ifaceInfo *temp = iface;
-	while(temp){
-		if(temp->ifaceIdx == ifaceIdx)
+	while (temp)    
+        {
+		if(temp->ifaceIdx != ifaceIdx)
 		{
-			continue;
+                        sendODR(sockfd, pack, temp->haddr, dst_mac, temp->ifaceIdx);
 		}
-		sendODR(sockfd, pack, temp->haddr, dst_mac, temp->ifaceIdx);
-		temp = temp->next;
+                temp = temp->next;
 	}
 }
 
@@ -508,8 +508,8 @@ void handlePFPacketSocketInfofromOtherODR(int uxsockfd, int pfsockfd)
 {
         //printf("\nTODO");
         struct sockaddr_ll saddr;
-        char src_mac[MAC_SIZE], dst_mac[MAC_SIZE], ether_frame [ETHR_FRAME_LEN];
-        int len, ifaceidx;
+        char src_mac[MAC_SIZE], dst_mac[MAC_SIZE], ether_frame [ETHR_FRAME_LEN], *ptr;
+        int len, ifaceidx, i;
         len = sizeof(saddr);
         odrpacket *packet;
         rtabentry *route;
@@ -517,8 +517,22 @@ void handlePFPacketSocketInfofromOtherODR(int uxsockfd, int pfsockfd)
         recvfrom(pfsockfd, ether_frame, ETHR_FRAME_LEN, 0, (SA *)&saddr, &len);
         
         packet = getODRPacketfromEthernetPacket(ether_frame);
-        strncpy(src_mac, ether_frame, MAC_SIZE);
-        strncpy(dst_mac, ether_frame + MAC_SIZE, MAC_SIZE);
+        memcpy(dst_mac, ether_frame, MAC_SIZE);
+        ptr = ether_frame;
+        printf ("\ndst Mac : ");
+        i = IF_HADDR;
+        do {
+                printf("%.2x%s", *ptr++ & 0xff, (i == 1) ? " " : ":");
+        } while (--i > 0);
+        memcpy(src_mac, ether_frame + MAC_SIZE, MAC_SIZE);
+        
+        ptr = src_mac;
+        printf ("\nsrc Mac : ");
+        i = IF_HADDR;
+        do {
+                printf("%.2x%s", *ptr++ & 0xff, (i == 1) ? " " : ":");
+        } while (--i > 0);
+        
         ifaceidx = saddr.sll_ifindex;
         
         if (packet->packet_type == 1)
@@ -579,15 +593,19 @@ odrpacket * getODRPacketfromEthernetPacket(char *ether_frame)
 
 void handleRREQPacket(int pfsockfd, char * src_mac, char * dst_mac, odrpacket * packet, int ifaceidx)
 {
-        printf("\nHandling RREQ");
+        printf("\nHandling RREQ\n");
         int hop, redisc_flag, asent;
         rtabentry * route;
 	odrpacket * req_packet, *rep_packet;
 //        int dup_rreq = checkDupPacket(packet->src_ip, packet->broadcastid); /* TODO : Check for duplicate RREQ. Stop Flooding */
 
-        int entry = add_routing_entry(RREQ, packet->src_ip, src_mac, ifaceidx, packet->hopcount, packet->broadcastid, packet->route_discovery);
-
-	if (strcmp(packet->dst_ip, canonicalIP) == 0)
+        int entry = add_routing_entry(RREQ, packet->src_ip, src_mac, ifaceidx, packet->hopcount + 1, packet->broadcastid, packet->route_discovery);
+        printf("\nRouting Entry in RREQ inserted.\n");
+         
+        print_routingtable();
+        printf("\nPrinting Routing Entry in RREQ inserted.\n");
+	
+        if (strcmp(packet->dst_ip, canonicalIP) == 0)
 	{	
                 /* RREQ reached  dest ip. Now create and send the response RREP back. */
 		route = routing_table_lookup(packet->src_ip, 0);
@@ -597,10 +615,13 @@ void handleRREQPacket(int pfsockfd, char * src_mac, char * dst_mac, odrpacket * 
                 /* Create a response RREP packet and send as ODR Frame . TODO : Add condition for asent Flag and Duplicate RReq */
                 if ((packet->rep_already_sent == 0) && (entry == 1))
                 {
-
+                
                         rep_packet = createRREPMessage(packet->dst_ip, packet->src_ip, packet->dest_port, packet->src_port, hop, redisc_flag);
 		        sendODR(pfsockfd, rep_packet, get_interface_mac(route->ifaceIdx), route->next_hop_MAC , route->ifaceIdx); //using get_interface_mac fresh entry
-	        }
+                        printf("\nReached Destination. Sending Response.");
+                }
+                else
+                        printf("\nReached Destination. Reply not sent");
         }
         else
         {	
@@ -632,26 +653,29 @@ void handleRREQPacket(int pfsockfd, char * src_mac, char * dst_mac, odrpacket * 
 
 void handleRREPPacket(int pfsockfd, char * src_mac, char * dst_mac, odrpacket * packet, int ifaceidx)
 {
-//        printf("\nRREP");
+        printf("\nRREP");
         rtabentry * route;
 	odrpacket * datapacket, *rep_packet;
-        int entry = add_routing_entry(RREP, packet->src_ip, src_mac, ifaceidx, packet->hopcount, 0, 0);
+        int entry = add_routing_entry(RREP, packet->src_ip, src_mac, ifaceidx, packet->hopcount + 1, 0, 0);
+        print_routingtable();
 
 	if (strcmp(packet->dst_ip, canonicalIP) == 0)
 	{	
                 /* RREP reached  dest ip. Now send the data request from server. TODO : Park client req in queue and Read from the queue. */
-		route = routing_table_lookup(packet->src_ip, 0);
+		printf("\nRREP Packet reached home to sender. Prepare DATA packet and resend.\n");
+                route = routing_table_lookup(packet->src_ip, 0);
 		char *msg = "Time request";
 		datapacket = createDataMessage (packet->dst_ip, packet->src_ip, packet->dest_port, packet->src_port, 0, msg);	
 		sendODR(pfsockfd, datapacket, get_interface_mac(route->ifaceIdx), route->next_hop_MAC , route->ifaceIdx); //using get_interface_mac fresh entry
 	}
 	else
 	{	
+		printf("\nRREP Packet reached intermediate node. Prepare RREP packet and resend.\n");
                 /* RREP forwarded when dest ip is not matched with Canonical IP of current VM */
 		route = routing_table_lookup(packet->dst_ip,0);	/*assuming there is an entry in rtable TODO otherwise */
 		packet->hopcount++;
                 /* Packet updates HOP Count and converts to htonl format */
-                rep_packet = createRREPMessage(packet->src_ip, packet->dst_ip, packet->src_port, packet->dest_port, packet->hopcount, packet->route_discovery);
+                rep_packet = createRREPMessage(packet->src_ip, packet->dst_ip, packet->src_port, packet->dest_port, packet->hopcount + 1, packet->route_discovery);
 		sendODR(pfsockfd, rep_packet, get_interface_mac(route->ifaceIdx), route->next_hop_MAC, route->ifaceIdx);
 	}
 }
@@ -659,46 +683,61 @@ void handleRREPPacket(int pfsockfd, char * src_mac, char * dst_mac, odrpacket * 
 void handleDATAPacket(int uxsockfd, int pfsockfd, char * src_mac, char * dst_mac, odrpacket * packet, int ifaceidx)
 {
         printf("\nDATA");
-	mrecv *rec;
-	port_spath_map *port_sun;
-	struct sockaddr_un clientaddr, saddr;
-	rtabentry *route;
-	odrpacket * datapacket;
-	msend msgdata;
-	char msg_stream[MSG_STREAM_SIZE], msg_str[MSG_STREAM_SIZE];
-	bzero(&clientaddr, sizeof(struct sockaddr_un));
-	bzero(&saddr, sizeof(struct sockaddr_un));
-	if(strcmp(packet->dst_ip, canonicalIP)==0)
-	{
-		strcpy(rec->srcIP, packet->src_ip);
-		rec->srcportno = packet->src_port;
-		strcpy(rec->msg,packet->datamsg);
-		clientaddr.sun_family = AF_LOCAL;
-		port_sun = port_lookup(packet->dest_port);
-	 	strcpy(clientaddr.sun_path, port_sun->sun_path);	
-		sprintf(msg_stream, "%s;%d;%s", rec->srcIP, rec->srcportno, rec->msg);
-		sendto(uxsockfd, msg_stream, sizeof(msg_stream), 0, (struct sockaddr *)&clientaddr, (socklen_t)sizeof(clientaddr));
-		int size = sizeof(saddr);
-		if(packet->dest_port == SERV_PORT_NO)
-		{
-			bzero (&msgdata, sizeof(msend));
-			recvfrom(uxsockfd, msg_str, DATA_SIZE, 1, (struct sockaddr *)&saddr, &size);
-			convertstreamtosendpacket(&msgdata, msg_str);
-			route = routing_table_lookup(msgdata.destIP,0);
-			datapacket = createDataMessage (canonicalIP, msgdata.destIP, SERV_PORT_NO, msgdata.destportno, 0, msgdata.msg);
-                	sendODR(pfsockfd, datapacket,get_interface_mac(route->ifaceIdx), route->next_hop_MAC, route->ifaceIdx);
-		}
-		else
-		{
-			return;
-		}
-	}
-	else
-	{
-		route = routing_table_lookup(packet->dst_ip, 0);
-		datapacket = createDataMessage (packet->src_ip, packet->dst_ip, packet->src_port, packet->dest_port, packet->hopcount++, packet->datamsg);	
-		sendODR(pfsockfd, datapacket,get_interface_mac(route->ifaceIdx), route->next_hop_MAC, route->ifaceIdx);
-	}
+        mrecv *rec = (mrecv *)malloc(sizeof(mrecv));
+        port_spath_map *port_sun;
+        struct sockaddr_un clientaddr, saddr;
+        rtabentry *route;
+        odrpacket * datapacket;
+        msend msgdata;
+        char msg_stream[MSG_STREAM_SIZE], msg_str[MSG_STREAM_SIZE];
+
+        bzero(&clientaddr, sizeof(struct sockaddr_un));
+        bzero(&saddr, sizeof(struct sockaddr_un));
+
+        if(strcmp(packet->dst_ip, canonicalIP)==0)
+        {
+                printf("\nData Packet Reached Destination.");
+                memcpy(rec->srcIP, packet->src_ip, IP_SIZE);
+                rec->srcportno = packet->src_port;
+                strcpy(rec->msg,packet->datamsg);
+
+                clientaddr.sun_family = AF_LOCAL;
+                printf("\nLooking Up Port No : %d", packet->dest_port);
+                port_sun = port_lookup(packet->dest_port);
+                strcpy(clientaddr.sun_path, port_sun->sun_path);	
+
+                printf("Writing stream on IP %s, port num : %d, msg = %s", rec->srcIP, rec->srcportno, rec->msg);
+                sprintf(msg_stream, "%s;%d;%s", rec->srcIP, rec->srcportno, rec->msg);
+
+                sendto(uxsockfd, msg_stream, MRECV_SIZE, 0, (struct sockaddr *)&clientaddr, (socklen_t)sizeof(clientaddr));
+
+                int size = sizeof(saddr);
+                if(packet->dest_port == SERV_PORT_NO)
+                {
+                        printf("\nSending Time Request to Server. Waiting for response. ");
+                        bzero (&msgdata, sizeof(msend));
+
+                        recvfrom(uxsockfd, msg_str, MSEND_SIZE, 0, (struct sockaddr *)&saddr, &size);
+                        printf("\nReceived Time from Server. Sending ODR Data Packet with time = %s \n", msgdata.msg);
+
+                        convertstreamtosendpacket(&msgdata, msg_str);
+                        route = routing_table_lookup(msgdata.destIP, 0);
+                        datapacket = createDataMessage (canonicalIP, msgdata.destIP, SERV_PORT_NO, msgdata.destportno, 0, msgdata.msg);
+                        sendODR(pfsockfd, datapacket,get_interface_mac(route->ifaceIdx), route->next_hop_MAC, route->ifaceIdx);
+                }
+                else
+                {
+                        printf("\nReceived final time. Communcation Ended !!! YAYYYYY !!!. \n");
+                        return;
+                }
+        }
+        else
+        {
+                printf("\nData Packet Being Forwarded to Destination.");
+                route = routing_table_lookup(packet->dst_ip, 0);
+                datapacket = createDataMessage (packet->src_ip, packet->dst_ip, packet->src_port, packet->dest_port, packet->hopcount + 1, packet->datamsg);	
+                sendODR(pfsockfd, datapacket,get_interface_mac(route->ifaceIdx), route->next_hop_MAC, route->ifaceIdx);
+        }
 }
 
 /*  Complete ODR Frame  REF ==> http://aschauf.landshut.org/fh/linux/udp_vs_raw/ch01s03.html   */
@@ -848,22 +887,24 @@ int isDuplicate(int broadcastid, char *destip)
 /* TODO : Handle all types of addtion/updates to routing table. Return 1 for success and 0 otherwise. */
 int add_routing_entry(int packet_type, char *destIP, char *next_hop_MAC, int ifaceIdx, int hopcount, int broadcastId, int rdisc)
 {
-        int checkdup;
+        printf("\nHandling Routing Table Entry Addition. Packet Type : %d, destIP : %s, ifaceIdx : %d, hopcount : %d, broadcastid : %d, rdisc : %d\n", packet_type, destIP, ifaceIdx, hopcount, broadcastId, rdisc);
+        int checkdup = 0;
         struct timeval current_time;
         rtabentry *newentry = (rtabentry *)malloc(sizeof(rtabentry));
         rtabentry *temp = routinghead, *entry;
         
-        if (packet_type == RREP)
+        if (packet_type == RREQ)
                 checkdup = isDuplicate(broadcastId, destIP);
         
         entry = routing_table_lookup(destIP, rdisc);
-
+        printf("\nLookup Routing Table Performed : check dup %d\n", checkdup);
         if ( entry == NULL)
         {
                 /* Create New Entry in Routing Table */
+                printf("\nNo Routing Table Found. Adding New Entry.\n");
                 newentry->ifaceIdx = ifaceIdx;
-                strcpy(newentry->destIP, destIP);
-                strcpy(newentry->next_hop_MAC, next_hop_MAC);
+                memcpy(newentry->destIP, destIP, IP_SIZE);
+                memcpy(newentry->next_hop_MAC, next_hop_MAC, MAC_SIZE);
                 newentry->hopcount = hopcount;
                 newentry->broadcastId = broadcastId;
 
@@ -881,11 +922,12 @@ int add_routing_entry(int packet_type, char *destIP, char *next_hop_MAC, int ifa
                         newentry->next = routinghead;
                         routinghead = newentry;
                 }
+                printf("Added New Entry.\n");
                 return 1;
         }
         else 
         {
-               if (packet_type == RREQ)
+               if ((packet_type == RREQ) && (rdisc == 0))
                {
                        if (entry->broadcastId < broadcastId)
                        {
@@ -895,6 +937,7 @@ int add_routing_entry(int packet_type, char *destIP, char *next_hop_MAC, int ifa
                                entry->ifaceIdx = ifaceIdx;
                                gettimeofday(&current_time, NULL);
                                entry->ts = current_time;
+                               printf("Updated existing Entry. New Broadcast ID. For RREQ. \n");
                                return 1;
                        }
                        if (checkdup)
@@ -907,10 +950,14 @@ int add_routing_entry(int packet_type, char *destIP, char *next_hop_MAC, int ifa
                                         entry->ifaceIdx = ifaceIdx;
                                         gettimeofday(&current_time, NULL);
                                         entry->ts = current_time;
+                                        printf("Updated existing Entry. Same Broadcast ID. hop <= rt->hopcount. For RREQ. \n");
                                         return 1;
                                }
-                               else 
+                               else
+                               {
+                                       printf("No Update. Same Broadcast ID. hop > rt->hopcount. For RREQ. \n");
                                        return 0;
+                               }
                        }
                }
                if (rdisc == 1) 
@@ -924,18 +971,23 @@ int add_routing_entry(int packet_type, char *destIP, char *next_hop_MAC, int ifa
                        entry->ifaceIdx = ifaceIdx;
                        gettimeofday(&current_time, NULL);
                        entry->ts = current_time;
+                       printf("Updated all existing Entries. rdisc = 1. For RREQ. \n");
                        return 1;
 
                }
-               else if (entry->hopcount >= hopcount)
+               else if ((entry->hopcount >= hopcount) && (packet_type != 1))
                {
                        strcpy(entry->next_hop_MAC, next_hop_MAC);
                        entry->hopcount = hopcount;
                        entry->ifaceIdx = ifaceIdx;
                        gettimeofday(&current_time, NULL);
                        entry->ts = current_time;
+                       printf("Updated existing Entry. rdisc != 1. For not RREQ. \n");
+                       return 1;
                }
         }
+        printf("Returning without any updates.\n");
+        return 0;
 }
 
 /* Updating the timestamp of the routing table entry */
@@ -976,9 +1028,8 @@ void print_routingtable()
 {	
         char destIP[IP_SIZE];
         char next_hop_MAC[MAC_SIZE];
-        int ifaceIdx;
-        int hopcount;
-        int broadcastId;
+        int ifaceIdx, hopcount, broadcastId, i;
+        char *ptr;
         struct timeval ts;
         printf("\n|-----------------------------------------------------------------------------------------------------------|\n");
         printf("\n| -- DestIP -- | -- Next-hop MAC -- | -- IfaceIDx -- | -- Hopcount -- | -- BroadcastID -- | -- timestamp -- |\n");
@@ -986,8 +1037,15 @@ void print_routingtable()
         rtabentry *temp = routinghead;
         while(temp)
         {
-                printf("\n| -- %s -- | -- %s -- | -- %d -- | -- %d -- | -- %d -- | -- %ld -- |\n", temp->destIP, temp->next_hop_MAC,
-                                temp->ifaceIdx, temp->hopcount, temp->broadcastId, (long)temp->ts.tv_sec);
+                printf("\n| -- %s -- | -- ", temp->destIP);
+                ptr = temp->next_hop_MAC;
+                i = IF_HADDR;
+                do {
+                        printf("%.2x%s", *ptr++ & 0xff, (i == 1) ? " " : ":");
+                } while (--i > 0);
+
+                printf("--| -- %d -- | -- %d -- | -- %d -- | -- %ld -- |\n", temp->ifaceIdx, temp->hopcount, temp->broadcastId, (long)temp->ts.tv_sec);
+                temp = temp->next;
         }
 }
 

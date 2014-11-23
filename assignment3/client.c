@@ -1,5 +1,6 @@
 #include "unp.h"
 #include "utils.h"
+#include "odr.h"
 #include  <setjmp.h>
 
 char serverVM[255], clientVM[255];
@@ -16,11 +17,11 @@ int main(int argc, char **argv)
 	int sockfd, fd, source_port;
 	char temp[100];
         mrecv recvd_msg;
-	char send_msg[1000] = "Time requested from server.";
+	char send_msg[MSG_STREAM_SIZE] = "Time requested from server.";
 	struct sockaddr_un clientaddr, serveraddr;
 	struct hostent *hp;
-	char ip_dest[100];
-	char ip_source[100];
+	char ip_dest[IP_SIZE];
+	char ip_source[IP_SIZE];
 	int flag;
 
 	Signal(SIGALRM, timeout_resend);
@@ -55,8 +56,8 @@ int main(int argc, char **argv)
 	        printf("\nServer canonical IP : %s", ip_dest);	
                 printf("\nClient at node %s sending request to server at %s", clientVM, serverVM);
 	   sending:
-		msg_send(sockfd, ip_dest, 5000, send_msg, flag);	//yet to be filled
-		alarm(5);
+		msg_send(sockfd, ip_dest, SERV_PORT_NO, send_msg, 0);	//yet to be filled
+		alarm(100);
 		if(sigsetjmp(jmpbuf,1)!=0)
         	{
 			if(flag == 0) {

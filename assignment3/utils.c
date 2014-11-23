@@ -6,7 +6,7 @@
 int msg_send(int sockfd, char *ip_dest, int dest_port, char *msg, int flag) 
 {
     struct sockaddr_un addr;
-    char sendcstream[MSG_STREAM_SIZE];
+    char sendcstream[MSEND_SIZE];
 
     sprintf(sendcstream, "%s;%d;%d;%s", ip_dest, dest_port, flag, msg);
     printf("\nSending Stream : %s", sendcstream);
@@ -22,9 +22,9 @@ int msg_send(int sockfd, char *ip_dest, int dest_port, char *msg, int flag)
 int msg_recv(int sockfd, mrecv * recv_p, struct sockaddr_un *addr)  
 {
 
-    char msg_stream[MSG_STREAM_SIZE];
+    char msg_stream[MRECV_SIZE];
     int len = sizeof(struct sockaddr_un);
-    if (recvfrom(sockfd, msg_stream, MSG_STREAM_SIZE, 0, (SA *)addr, &len) < 0)
+    if (recvfrom(sockfd, msg_stream, MRECV_SIZE, 0, (SA *)addr, &len) < 0)
     {
         printf("error in reading data!");
         return -1;
