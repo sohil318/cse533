@@ -78,9 +78,19 @@ typedef struct ODRpacket    {
 }odrpacket;
 /***********************************************************************/
 
-
+/***********************************************************************/
+/* Queue for ODR Packet Parking */
+typedef struct PacketQueue    {
+        odrpacket * packet;
+        struct PacketQueue *next;
+}packetq;
+/***********************************************************************/
 
 /************************************************************************************************************************************************/
+
+void add_packing_queue(odrpacket * packet);
+odrpacket * lookup_packing_queue(char *srcip);
+void remove_node_link(char *srcip);
 
 char* readInterfaces();
 void print_interfaceInfo ();
@@ -115,7 +125,7 @@ void RREQ_broadcast(int sockfd, odrpacket *pack, int ifaceIdx);
 int isDuplicate(int broadcastid, char *destip);
 int add_routing_entry(int packet_type, char *destIP, char *next_hop_MAC, int ifaceIdx, int hopcount, int broadcastId, int rdisc);
 void update_routing_entry_ts(rtabentry *update);
-rtabentry * routing_table_lookup(char *destIP, int disc_flag);
+rtabentry * routing_table_lookup(char *destIP, int disc_flag, int broadcastId);
 void print_routingtable();
 
 /************************************************************************************************************************************************/

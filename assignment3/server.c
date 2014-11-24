@@ -23,7 +23,7 @@ int main(int argv, char **argc){
     strcpy(serveraddr.sun_path, SERV_SUN_PATH);
     
     Bind(sockfd, (SA*) &serveraddr, sizeof(serveraddr));
-    printf("\nServer Bound at sun_path %s\n" , serveraddr.sun_path);
+//    printf("\nServer Bound at sun_path %s\n" , serveraddr.sun_path);
     gethostname(serverVM, sizeof(serverVM));
     while (1)
     {
@@ -32,7 +32,7 @@ int main(int argv, char **argc){
         
         hp = gethostbyaddr((char*)&ip, sizeof(ip), AF_INET);
         
-        printf("\nServer at node %s responding to request from %s", serverVM, hp->h_name);
+        printf("\nServer at node %s responding to request from %s\n", serverVM, hp->h_name);
         time_s = time(NULL);
         bzero(reply, sizeof(reply));
         snprintf(reply,sizeof(reply),"%.24s",(char *)ctime(&time_s));

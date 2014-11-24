@@ -23,7 +23,9 @@ int msg_recv(int sockfd, mrecv * recv_p, struct sockaddr_un *addr)
 {
 
     char msg_stream[MRECV_SIZE];
+
     int len = sizeof(struct sockaddr_un);
+//    printf("\nWaiting on receive. \n");
     if (recvfrom(sockfd, msg_stream, MRECV_SIZE, 0, (SA *)addr, &len) < 0)
     {
         printf("error in reading data!");
