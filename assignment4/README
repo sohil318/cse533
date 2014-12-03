@@ -1,0 +1,74 @@
+	README FOR ASSIGNMENT-3 (CSE-533)
+------------------------------------------------
+
+    GROUP MEMBERS:
+    . Sohil Gandhi (sogandhi)   109395892
+    . Shipra Gupta (shipgupta)  109348052
+
+
+		ASSIGNMENT TASK:
+-------------------------------------------------
+We had to implement :
+* An On-Demand shortest-hop Routing (ODR) protocol for networks of fixed but arbitrary and unknown connectivity, using PF_PACKET sockets. The implementation is based on (a simplified version of) the AODV algorithm.
+    	
+* Time client and server applications that send requests and replies to each other across the network using ODR. An API you will implement using Unix domain datagram sockets enables applications to communicate with the ODR mechanism running locally at their nodes.
+
+Below, we have explained some of the details about our design and implementation in this assignment:
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+- HOW TO RUN:
+
+  ./odr_sgupta_sgandhi [staleness parameter] : To run ODR on a node. Accepts staleness parameter to be used throughout.  
+
+  ./client_sgupta_sgandhi : To run client on a given node. Prompts user to enter the machine name to request the time.
+
+  ./server_sgupta_sgandhi : To run server on a given node.
+
+
+- ODR PACKET STRUCTURE:
+	
+	struct ODRpacket    {
+	    int packet_type;					/* To identify the type of packet (RREQ, RREP, DATA)					*/
+	    char src_ip[IP_SIZE];				/* Canonical ip address of the source node						*/
+	    int src_port;					/* Source port number 									*/
+	    char dst_ip[IP_SIZE];				/* Canonical ip address of the destination node					        */
+	    int dest_port;					/* Destination port number 								*/
+	    int broadcastid;					/* Broadcast Id										*/	
+	    int hopcount;					/* Number of hops to destination                                                    	*/
+	    int rep_already_sent;				/* Flag to identify if reply is sent 							*/
+	    int route_discovery;				/* Flag to force route discovery							*/
+	    char datamsg[DATA_SIZE];				/* Data payload										*/
+	}odrpacket;
+
+	packet_type:
+	
+	1 - RREQ
+	2 - RREP
+	3 - DATA
+
+
+- LINKED_LIST OF STRUCTURES FOR ROUTING TABLE:
+    We created a structure called rtabentry to store the information of each routing table entry. The structure is defined as follows:
+
+	/* Structure with routing table entry. */
+	typedef struct routing_table_entry  {
+	    char destIP[IP_SIZE];				/* Destination canonical ip address 							*/
+	    char next_hop_MAC[MAC_SIZE];			/* MAC address of the next hop to which the packet is to be sent			*/
+   	    int ifaceIdx;					/* Interface index of the current machine through  which the packet is to be sent 	*/
+  	    int hopcount;					/* Number of hops to destination 							*/
+	    int broadcastId;					/* Broadcast Id										*/
+	    struct timeval ts;					/* Timestamp of when the entry was made, to keep track of staleness			*/
+	    struct routing_table_entry *next;			/* Next entry										*/
+	} rtabentry;
+
+A sample routing table looks like this:
+
+	|------------------------------------------------------------------------------------------------------------------------|
+	|     -- DestIP --     |    -- Next-hop MAC --  | -- IfaceIDx -- | -- Hopcount -- | -- BroadcastID -- | -- timestamp --  |
+	|------------------------------------------------------------------------------------------------------------------------|
+	| -- 130.245.156.20 -- | -- 00:0c:29:9e:80:87 --|     -- 4 --    |     -- 7 --    |      -- 0 --      | -- 1416838494 -- |
+	| -- 130.245.156.22 -- | -- 00:0c:29:d9:08:f6 --|     -- 3 --    |     -- 1 --    |      -- 0 --      | -- 1416838494 -- |
+        |------------------------------------------------------------------------------------------------------------------------|
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
