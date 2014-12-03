@@ -1,0 +1,11 @@
+#!/bin/bash
+if [ $# -lt 1 ]
+then 
+  echo "Usage: upload <List of files>"
+  exit 0
+fi
+
+echo "Deploying Files on Minix: " 
+scp -p $@ sogandhi@minix.cs.stonybrook.edu:/home/stufs1/sogandhi
+scp -p $@ shipgupta@minix.cs.stonybrook.edu:/home/stufs1/shipgupta
+
