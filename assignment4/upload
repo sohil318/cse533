@@ -6,6 +6,6 @@ then
 fi
 
 echo "Deploying Files on Minix: " 
-scp -p $@ sogandhi@minix.cs.stonybrook.edu:/home/stufs1/sogandhi
-scp -p $@ shipgupta@minix.cs.stonybrook.edu:/home/stufs1/shipgupta
+scp -p $@ sogandhi@minix.cs.stonybrook.edu:/home/stufs1/sogandhi/cse533/assignment4
+scp -p $@ shipgupta@minix.cs.stonybrook.edu:/home/stufs1/shipgupta/cse533/assignment4
 
