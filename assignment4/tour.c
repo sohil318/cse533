@@ -6,6 +6,7 @@
 #include        <stdio.h>
 #include        <time.h>
 
+int visited = 0;
 
 /* Create 4 Sockets for the tour application */
 int createSocket(int *pfsockfd, int *rtsockfd, int *pgsockfd, int *multisockfd)
@@ -184,14 +185,14 @@ void send_tour_packet(int rtsockfd, tpayload *packet, int userlen)
 }
 
 /* Join the multicast group using mcast_join function */
-void addtomulticastgroup(int sockfd)
+void addtomulticastgroup(int sockfd, char *ip)
 {
         struct sockaddr_in addr;
 
         bzero(&addr, sizeof(addr));
         addr.sin_family         =       AF_INET;
         addr.sin_port           =       htons(MCAST_PORT);      /* TODO : Confirm about htons */
-        inet_pton(AF_INET, MCAST_IP, &addr.sin_addr);
+        inet_pton(AF_INET, ip, &addr.sin_addr);
 
         Mcast_join(sockfd, (const SA *)&addr, sizeof(addr), NULL, 0);
 
@@ -200,16 +201,18 @@ void addtomulticastgroup(int sockfd)
 /* Handle Incoming Tour IP RAW Packet */
 void handletourpacket(int rtsockfd, int multisockfd, int pgsockfd)
 {
-        char buff[IP_PACK_SIZE], src_ip[IP_SIZE];
-        struct sockaddr_in addr;
+        char buff[IP_PACK_SIZE], src_ip[IP_SIZE], vm_name[HOST_SIZE], mcast_msg[MSG_SIZE];
+        struct sockaddr_in addr, mcast_addr;
         struct in_addr  iaddr;
         struct ip *packhead;
+        struct hostent *he;
+       
         tpayload *data;
         int len = sizeof(addr);
         time_t ticks;
 
         Recvfrom(rtsockfd, (void *)buff, IP_PACK_SIZE, 0, (SA *)&addr, &len);
-        //printf("Packet received\n");
+        
         packhead = (struct ip *)buff;
         data = (tpayload *)(buff + 20);
        
@@ -220,16 +223,46 @@ void handletourpacket(int rtsockfd, int multisockfd, int pgsockfd)
         }
 
         ticks = time(NULL);
-
-        struct hostent *he;
         he = (struct hostent *)malloc(sizeof(struct hostent));
-       
+
         iaddr.s_addr = packhead->ip_src.s_addr;
-        strcpy(src_ip, inet_ntoa(iaddr));
-        printf("Src IP : %s\n", src_ip); 
+//        strcpy(src_ip, inet_ntoa(iaddr));
+//        printf("Src IP : %s\n", src_ip); 
         he = gethostbyaddr(&iaddr, sizeof(iaddr), AF_INET);
          
         printf("%.24s: Received source routing packet from %s\n", (char *)ctime(&ticks), he->h_name);
+        printTourPacket(*data);
+        gethostname(vm_name, sizeof(vm_name));
+
+
+        if (visited == 0)
+        {
+                visited = 1;
+
+                /* Add to Multicast Group */
+                bzero(&mcast_addr, sizeof(struct sockaddr_in));
+                mcast_addr.sin_family           =       AF_INET;
+                mcast_addr.sin_port             =       htons(data->multi_port);
+                mcast_addr.sin_addr.s_addr      =       htonl(INADDR_ANY);
+
+                Bind(multisockfd, (SA *)&mcast_addr, sizeof(mcast_addr));
+
+                /* TODO : Add to Multicast Group */
+                printf("Adding %s to multicast group.\n", vm_name);
+                addtomulticastgroup(multisockfd, data->multi_ip);
+                
+        }
+
+        if (data->next_ip_idx + 1 == data->tour_size)
+        {
+                sprintf(mcast_msg, "<<<<<<<<<<<<<< This is node %s. Tour has ended. Group Members please identify yourselves. >>>>>>>>>>", vm_name);
+                printf("%s\n", mcast_msg); 
+        }                
+        else
+        {
+                send_tour_packet(rtsockfd, data, sizeof(tpayload)); 
+        }
+
 }
 
 
@@ -255,6 +288,7 @@ int main(int argc, char *argv[])
 //              printf("List of IP Addresses main : %s \n", ipAddrs);
                 createPayload(&packet, 0, argc, ipAddrs);
                 printTourPacket(packet);
+//                send_tour_packet(rtsockfd, &packet, sizeof(tpayload)); 
                 
                 bzero(&mcast_addr, sizeof(struct sockaddr_in));
                 mcast_addr.sin_family           =       AF_INET;
@@ -264,7 +298,7 @@ int main(int argc, char *argv[])
                 Bind(multisockfd, (SA *)&mcast_addr, sizeof(mcast_addr));
 
                 /* TODO : Add to Multicast Group */
-                addtomulticastgroup(multisockfd);
+                addtomulticastgroup(multisockfd, MCAST_IP);
 
                 /* Send Tour packet thru Tour IP RAW Socket */
                 send_tour_packet(rtsockfd, &packet, sizeof(tpayload)); 

@@ -11,6 +11,7 @@
 #define         MAX_TOUR_SIZE   90                              // Store maximum 95 IP addresses in the tour
 #define         IP_PACK_SIZE    1500
 #define         IP_IDENT        5892
+#define         MSG_SIZE        200
 
 typedef struct TourPayload
 {
@@ -28,7 +29,7 @@ void printTourPacket(tpayload packet);
 uint32_t getIPaddrbyIdx(tpayload *packet, int idx);
 unsigned short csum(unsigned short *buf, int nwords);
 void send_tour_packet(int rtsockfd, tpayload *packet, int userlen);
-void addtomulticastgroup(int sockfd);
+void addtomulticastgroup(int sockfd, char *ip);
 void handletourpacket(int rtsockfd, int multisockfd, int pgsockfd);
 
 #endif  /* __TOUR_h */
