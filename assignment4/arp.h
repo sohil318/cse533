@@ -3,5 +3,6 @@
 
 #include    "unp.h"
 
+#define		IPPROTO_ID		1554	 
 #endif  /* __ARP_h */
 
