@@ -1,10 +1,10 @@
 #include        "utils.h"
 #include 	"tour.h"
-#include        "unp.h"
 #include        <stdlib.h>
 #include        <linux/if_ether.h>
 #include        <netinet/ip.h>
 #include        <stdio.h>
+#include        <time.h>
 
 
 /* Create 4 Sockets for the tour application */
@@ -50,19 +50,18 @@ int createSocket(int *pfsockfd, int *rtsockfd, int *pgsockfd, int *multisockfd)
 }
 
 /* Create IP String for payload , add source IP */
-void converthostnametoIP(int argc, char *argv[], char *ipAddrs)
+void converthostnametoIP(int argc, char *argv[], uint32_t *ipAddrs)
 {
         int i;
         struct hostent *hp;
+
         char hostname[HOST_SIZE], ip_dest[IP_SIZE];
         gethostname(hostname, sizeof(hostname));
         printf("Local Machine Hostname is :  %s\n", hostname);
 
         hp = (struct hostent *)gethostbyname((const char *)hostname);	
-        sprintf(ip_dest, "%s", (char *)inet_ntoa( *(struct in_addr *)(hp->h_addr_list[0])));
+        ipAddrs[0] = ((struct in_addr *)hp->h_addr_list[0])->s_addr;
         
-        strcpy(ipAddrs, ip_dest);
-        strcat(ipAddrs, ";");
         
         for (i = 1; i < argc; i++)
         {
@@ -73,51 +72,42 @@ void converthostnametoIP(int argc, char *argv[], char *ipAddrs)
                 }
 
                 hp = (struct hostent *)gethostbyname((const char *)argv[i]);	
-                sprintf(ip_dest, "%s", (char *)inet_ntoa( *(struct in_addr *)(hp->h_addr_list[0])));
+                ipAddrs[i] = ((struct in_addr *)hp->h_addr_list[0])->s_addr;
 
-                strcat(ipAddrs, ip_dest);
-                strcat(ipAddrs, ";");
         }        
 //        printf("List of IP Addresses Final: %s \n", ipAddrs);
 }
 
 /* Create Payload Struct with the tour packet information */
-void createPayload(tpayload *packet, int idx, int tour_size, char *ipaddrs)  
+void createPayload(tpayload *packet, int idx, int tour_size, uint32_t *ipaddrs)  
 {
         packet->next_ip_idx     =       idx;
         packet->tour_size       =       tour_size;
         packet->multi_port      =       MCAST_PORT;       
         memcpy(packet->multi_ip, MCAST_IP, sizeof(MCAST_IP));       
-        strcpy(packet->ip_addrs, ipaddrs);
+        memcpy(packet->ip_addrs, ipaddrs, sizeof(uint32_t) * tour_size);
 }
 
 /* Print tour packet Payload. */
 void printTourPacket(tpayload packet)  
 {
-        printf("Curr IP index : %d, Tour Size : %d, Multicast port : %d, Multicast IP : %s, List of IP's : %s\n", packet.next_ip_idx, packet.tour_size, packet.multi_port, packet.multi_ip, packet.ip_addrs);
+        int i = 0;
+        struct in_addr addr;
+        char *ip;
+        printf("Curr IP index : %d, Tour Size : %d, Multicast port : %d, Multicast IP : %s, List of IP's : ", packet.next_ip_idx, packet.tour_size, packet.multi_port, packet.multi_ip);
+        for ( i = 0; i < packet.tour_size; i++)
+        {
+                addr.s_addr = packet.ip_addrs[i];
+                ip = inet_ntoa(addr);
+                printf("%s;",ip); 
+        }
+        printf("\n");
 }
 
 /* Get IP Address by Index from tour packet */
-char * getIPaddrbyIdx(tpayload *packet, int idx, char *ip)
+uint32_t getIPaddrbyIdx(tpayload *packet, int idx)
 {
-        char buff[MAX_TOUR_SIZE * IP_SIZE], *tempip;
-        strcpy(buff, packet->ip_addrs);
-        //ip = strtok(packet->ip_addrs, ";");
-        tempip = strtok(buff, ";");
-        if (idx == 0)
-        {
-//              printf("IP Address : %s\n", tempip);
-                strcpy(ip, tempip);
-                return;
-        }
-
-        while (idx > 0)
-        {
-                tempip = strtok(NULL, ";");
-                idx--;
-        }
-        strcpy(ip, tempip);
-//      printf("IP Address : %s\n", ip);
+        return packet->ip_addrs[idx];
 }
 
 /* Calculate Checksum */
@@ -134,36 +124,40 @@ unsigned short csum(unsigned short *buf, int nwords)
 /* Send tour Packet , and update ip index */
 void send_tour_packet(int rtsockfd, tpayload *packet, int userlen)
 {
-        char src_ip[IP_SIZE], dst_ip[IP_SIZE], buf[IP_PACK_SIZE];
+        char *src_ip, *dst_ip, buf[IP_PACK_SIZE];
+        uint32_t sip, dip;
+        struct in_addr addr;
         struct sockaddr_in local, dest;
 	struct ip       *ip;
 
-        bzero(&local, sizeof(local));
         bzero(&dest, sizeof(dest));
-//        addr.sin_family         =       AF_INET;
-//        addr.sin_port           =       htons(MCAST_PORT);      /* TODO : Confirm about htons */
+        src_ip = (char *)malloc(IP_SIZE);
+        dst_ip = (char *)malloc(IP_SIZE);
         
-        getIPaddrbyIdx(packet, packet->next_ip_idx, src_ip);            /* Get Source IP address */
+        sip = getIPaddrbyIdx(packet, packet->next_ip_idx);            /* Get Source IP address */
+        addr.s_addr = sip;
+        strcpy(src_ip, inet_ntoa(addr));
         printf("Src IP : %s\n", src_ip); 
-        inet_pton(AF_INET, src_ip, &local.sin_addr);
         
         packet->next_ip_idx++;                                          /* Increment IP Index of packet payload */  
         
-        getIPaddrbyIdx(packet, packet->next_ip_idx, dst_ip);            /* Get Destination IP address */
+        dip = getIPaddrbyIdx(packet, packet->next_ip_idx);            /* Get Destination IP address */
+        addr.s_addr = dip;
+        strcpy(dst_ip, inet_ntoa(addr));
         printf("Dest IP : %s\n", dst_ip); 
-        inet_pton(AF_INET, dst_ip, &dest.sin_addr);
 
+        userlen += sizeof(struct ip);
+        memset(buf, 0, userlen);
 
-        memset(buf, 0, IP_PACK_SIZE);
-
-        char *tourpacket = buf + 20;
+        char *tourpacket = buf + sizeof(struct ip);
 
 	/* 4fill in and checksum UDP header */
 	ip = (struct ip *) buf;
 	
-        userlen += sizeof(struct ip);
 
 	/* 4ip_output() calcuates & stores IP header checksum */
+	ip->ip_src.s_addr = sip;
+	ip->ip_dst.s_addr = dip;
 	ip->ip_v = IPVERSION;
 	ip->ip_hl = sizeof(struct ip) >> 2;
 	ip->ip_tos = 0;
@@ -172,14 +166,20 @@ void send_tour_packet(int rtsockfd, tpayload *packet, int userlen)
 #else
 	ip->ip_len = userlen;			/* host byte order */
 #endif
-	ip->ip_id  = htons(0);			/* let IP set this */
+	ip->ip_id  = htons(IP_IDENT);			/* let IP set this */
 	ip->ip_off = 0;			/* frag offset, MF and DF flags */
 	ip->ip_ttl = 1;
-        ip->ip_p   = htons(RT_PROTO); 
+        ip->ip_p   = RT_PROTO; 
         memcpy((void *)tourpacket, (void *)packet, sizeof(tpayload));
-        ip->ip_sum = csum((unsigned short *)buf, userlen);
+        ip->ip_sum = htons(csum((unsigned short *)buf, userlen));
+        
+        printf("Tour Data Packet: %s\n", tourpacket); 
+
+        dest.sin_addr.s_addr = dip;
+        dest.sin_family      = AF_INET;
 
 	Sendto(rtsockfd, buf, userlen, 0, (SA *)&dest, sizeof(dest));
+        printf("Sending IP Packet from %s to %s\n", src_ip, dst_ip);
 
 }
 
@@ -197,24 +197,63 @@ void addtomulticastgroup(int sockfd)
 
 }
 
+/* Handle Incoming Tour IP RAW Packet */
+void handletourpacket(int rtsockfd, int multisockfd, int pgsockfd)
+{
+        char buff[IP_PACK_SIZE], src_ip[IP_SIZE];
+        struct sockaddr_in addr;
+        struct in_addr  iaddr;
+        struct ip *packhead;
+        tpayload *data;
+        int len = sizeof(addr);
+        time_t ticks;
+
+        Recvfrom(rtsockfd, (void *)buff, IP_PACK_SIZE, 0, (SA *)&addr, &len);
+        //printf("Packet received\n");
+        packhead = (struct ip *)buff;
+        data = (tpayload *)(buff + 20);
+       
+        if (ntohs(packhead->ip_id) != IP_IDENT)
+        {
+                printf("Invalid Packet identifier Received.\n");
+                return;
+        }
+
+        ticks = time(NULL);
+
+        struct hostent *he;
+        he = (struct hostent *)malloc(sizeof(struct hostent));
+       
+        iaddr.s_addr = packhead->ip_src.s_addr;
+        strcpy(src_ip, inet_ntoa(iaddr));
+        printf("Src IP : %s\n", src_ip); 
+        he = gethostbyaddr(&iaddr, sizeof(iaddr), AF_INET);
+         
+        printf("%.24s: Received source routing packet from %s\n", (char *)ctime(&ticks), he->h_name);
+}
+
 
 int main(int argc, char *argv[])
 {
 //      printf("\nTour Main");
         struct sockaddr_in mcast_addr;
         tpayload packet;
-        char ipAddrs[MAX_TOUR_SIZE * IP_SIZE];
+        uint32_t *ipAddrs;
 
+        ipAddrs = (uint32_t *)malloc(argc * sizeof(uint32_t));
+        
         int multisockfd, pfsockfd, rtsockfd, pgsockfd;
         
         if((createSocket(&pfsockfd, &rtsockfd, &pgsockfd, &multisockfd)) == -1)
                 return 0;
         
+        printf("Multisockfd %d, pfsockfd %d, rtsockfd %d, pgsockfd %d\n", multisockfd, pfsockfd, rtsockfd, pgsockfd);
+
         if (argc > 1)
         {
                 converthostnametoIP(argc, argv, ipAddrs);
 //              printf("List of IP Addresses main : %s \n", ipAddrs);
-                createPayload(&packet, 0, argc - 1, ipAddrs);
+                createPayload(&packet, 0, argc, ipAddrs);
                 printTourPacket(packet);
                 
                 bzero(&mcast_addr, sizeof(struct sockaddr_in));
@@ -229,6 +268,53 @@ int main(int argc, char *argv[])
 
                 /* Send Tour packet thru Tour IP RAW Socket */
                 send_tour_packet(rtsockfd, &packet, sizeof(tpayload)); 
+
+        }
+
+        int     maxfdpl, nready;
+        fd_set  rset, allset;
+
+        FD_ZERO(&allset);
+        FD_ZERO(&rset);
+	
+        FD_SET(rtsockfd, &allset);
+        FD_SET(pgsockfd, &allset);
+        FD_SET(multisockfd, &allset);
+        
+        if ((rtsockfd > pgsockfd) && (rtsockfd > multisockfd))
+                maxfdpl = rtsockfd;
+        else if ((pgsockfd > rtsockfd) && (pgsockfd > multisockfd))
+                maxfdpl = pgsockfd;
+        else
+                maxfdpl = multisockfd;
+
+	for ( ; ; ) 
+        {
+		rset = allset;
+                nready = select(maxfdpl + 1, &rset, NULL, NULL, NULL); 
+	        if (nready < 0)
+                {
+                        if (errno == EINTR)
+                        {
+                                printf("EINTR error !\n");
+                                continue;
+                        }
+                        else
+                        {
+		                perror("select error");
+                                exit (0);
+                        }
+                }
+		if (FD_ISSET(rtsockfd, &rset)) {	/* socket is readable */
+                //        printf("Received Tour packet.\n");
+                        handletourpacket(rtsockfd, multisockfd, pgsockfd);
+		}
+		if (FD_ISSET(pgsockfd, &rset)) {	/* socket is readable */
+	        //        n = readline(sockFD, recvline, MAXBUF);
+		}
+		if (FD_ISSET(multisockfd, &rset)) {	/* socket is readable */
+	        //        n = readline(sockFD, recvline, MAXBUF);
+		}
 
         }
         return 0;

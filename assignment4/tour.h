@@ -10,6 +10,7 @@
 #define         RT_PROTO        197         
 #define         MAX_TOUR_SIZE   90                              // Store maximum 95 IP addresses in the tour
 #define         IP_PACK_SIZE    1500
+#define         IP_IDENT        5892
 
 typedef struct TourPayload
 {
@@ -17,17 +18,18 @@ typedef struct TourPayload
         int tour_size;
         int multi_port;        
         char multi_ip[IP_SIZE];
-        char ip_addrs[MAX_TOUR_SIZE * IP_SIZE];
+        uint32_t ip_addrs[MAX_TOUR_SIZE];
 }tpayload;
 
 int createSocket(int *pfsockfd, int *rtsockfd, int *pgsockfd, int *multisockfd);
-void converthostnametoIP(int argc, char *argv[], char *ipAddrs);
-void createPayload(tpayload *packet, int idx, int tour_size, char *ipaddrs);
+void converthostnametoIP(int argc, char *argv[], uint32_t *ipAddrs);
+void createPayload(tpayload *packet, int idx, int tour_size, uint32_t *ipaddrs);
 void printTourPacket(tpayload packet);
-char * getIPaddrbyIdx(tpayload *packet, int idx, char *ip);
+uint32_t getIPaddrbyIdx(tpayload *packet, int idx);
 unsigned short csum(unsigned short *buf, int nwords);
-void send_tour_packet(int rtsockfd, tpayload *packet, int len);
+void send_tour_packet(int rtsockfd, tpayload *packet, int userlen);
 void addtomulticastgroup(int sockfd);
+void handletourpacket(int rtsockfd, int multisockfd, int pgsockfd);
 
 #endif  /* __TOUR_h */
 
