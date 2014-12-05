@@ -393,7 +393,10 @@ void proc_v4(char *ptr, ssize_t len, struct msghdr *msg, struct timeval *tvrecv)
 	ip = (struct ip *) ptr;		/* start of IP header */
 	hlen1 = ip->ip_hl << 2;		/* length of IP header */
 	if (ip->ip_p != IPPROTO_ICMP)
+        {
+                printf("Rejecting ICMP Reply. Not Mine. \n");
 		return;				/* not ICMP */
+        }
 
 	icmp = (struct icmp *) (ptr + hlen1);	/* start of ICMP header */
 	if ( (icmplen = len - hlen1) < 8)
@@ -612,11 +615,46 @@ void handlemultipacket(int multisockfd)
         sprintf(mcast_msg, "<<<<< Node %s. I am member of group. >>>>>", vm_name);
         sendMulticastPacket(multisockfd, mcast_msg, MCAST_PORT, MCAST_IP);
 
+        int     maxfdpl, nready, i;
+        fd_set  rset, allset;
+        struct timeval tv;
+
+        FD_ZERO(&allset);
+        FD_ZERO(&rset);
+	
+        FD_SET(multisockfd, &allset);
+        
+        maxfdpl = multisockfd;
+
         for (;;)
         {
-                Recvfrom(multisockfd, (void *)buff, IP_PACK_SIZE, 0, (SA *)&mcast_addr, &len);
-                gethostname(vm_name, sizeof(vm_name));
-                printf("Node %s. Received  %s\n", vm_name, buff);
+                tv.tv_sec = 5;
+                tv.tv_usec = 0;
+                rset = allset;
+
+                nready = select(maxfdpl + 1, &rset, NULL, NULL, &tv); 
+	        if (nready < 0)
+                {
+                        if (errno == EINTR)
+                        {
+                                printf("EINTR error !\n");
+                                continue;
+                        }
+                        else
+                        {
+		                perror("select error");
+                                exit (0);
+                        }
+                }
+                if (nready == 0)                {
+                        printf("Exiting Tour Application..\n");
+                        exit (0);
+                }
+                if (FD_ISSET(multisockfd, &rset))  {	/* socket is readable */
+                        Recvfrom(multisockfd, (void *)buff, IP_PACK_SIZE, 0, (SA *)&mcast_addr, &len);
+                        gethostname(vm_name, sizeof(vm_name));
+                        printf("Node %s. Received  %s\n", vm_name, buff);
+                }
         }
 }
 
