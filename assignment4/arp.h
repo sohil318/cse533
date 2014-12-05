@@ -31,5 +31,7 @@ unsigned char dest_mac[6];
 char dest_ip[IP_SIZE];
 } arp_pack;
 
+char* getMacAddr();
+
 #endif  /* __ARP_h */
 

@@ -17,5 +17,7 @@ struct writeArq{
 	struct hwaddr hw;
 	char ip_addr[IP_SIZE];
 };
+
+
 #endif  /* __UTILS_h */
 

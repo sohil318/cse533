@@ -19,8 +19,8 @@ sogaship_tour: tour.o get_hw_addrs.o utils.o
 tour.o: tour.c
 	${CC} ${CFLAGS} -c tour.c
 
-sogaship_arp: arp.o utils.o
-	${CC} -o sogaship_arp arp.o utils.o ${LIBS}
+sogaship_arp: arp.o get_hw_addrs.o utils.o
+	${CC} -o sogaship_arp arp.o get_hw_addrs.o utils.o ${LIBS}
 arp.o: arp.c
 	${CC} ${CFLAGS} -c arp.c
 

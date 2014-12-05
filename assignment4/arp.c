@@ -4,6 +4,44 @@
 #include 	<sys/socket.h>
 #include 	<linux/if_ether.h>
 #include 	<linux/if_packet.h>
+#include	"hw_addrs.h"
+
+int ifaceIdx;
+/* Get Host MAC Address */
+char* getMacAddr()
+{
+        struct hwa_info	*hwa, *hwahead;
+        char   *ptr = NULL, *hptr;
+        int    i, prflag;
+
+        hptr = (void *)malloc(MAC_SIZE);
+
+        for (hwahead = hwa = Get_hw_addrs(); hwa != NULL; hwa = hwa->hwa_next) {
+
+                if (strcmp(hwa->if_name, "eth0") == 0)  
+                {
+                        ifaceIdx = hwa->if_index;
+                        prflag = 0;
+                        i = 0;
+                        do {
+                                if (hwa->if_haddr[i] != '\0') {
+                                        prflag = 1;
+                                        break;
+                                }
+                        } while (++i < IF_HADDR);
+
+                        if (prflag) {
+                                printf("         HW addr = ");
+                                ptr = hwa->if_haddr;
+                                memcpy(hptr, hwa->if_haddr, MAC_SIZE);
+                        }
+                        return hptr;
+                }
+        }
+
+        return NULL;
+}
+
 
 int main()
 {

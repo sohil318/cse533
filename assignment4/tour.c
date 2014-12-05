@@ -230,6 +230,29 @@ int get_vm_index(uint32_t ip)
         return idx;
 }
 
+/* Print Mac Address */
+void printmac(char *mac)
+{
+        char *ptr = mac;
+        int i = IF_HADDR;
+        do {
+                printf("%.2x%s", *ptr++ & 0xff, (i == 1) ? " " : ":");
+        } while (--i > 0);
+
+}
+
+/* Get Source IP Address */
+uint32_t getsrcipaddr()
+{
+        struct hostent *hp;
+        char hostname[HOST_SIZE];
+
+        gethostname(hostname, sizeof(hostname));
+        hp = (struct hostent *)gethostbyname((const char *)hostname);	
+
+        return ((struct in_addr *)hp->h_addr_list[0])->s_addr;
+}
+
 /* Get Host MAC Address */
 char* getSrcMacAddr()
 {
@@ -265,28 +288,7 @@ char* getSrcMacAddr()
         return NULL;
 }
 
-/* Print Mac Address */
-void printmac(char *mac)
-{
-        char *ptr = mac;
-        int i = IF_HADDR;
-        do {
-                printf("%.2x%s", *ptr++ & 0xff, (i == 1) ? " " : ":");
-        } while (--i > 0);
 
-}
-
-/* Get Source IP Address */
-uint32_t getsrcipaddr()
-{
-        struct hostent *hp;
-        char hostname[HOST_SIZE];
-
-        gethostname(hostname, sizeof(hostname));
-        hp = (struct hostent *)gethostbyname((const char *)hostname);	
-
-        return ((struct in_addr *)hp->h_addr_list[0])->s_addr;
-}
 
 /* Send echo request */
 int send_ping_req(int pfsockfd, int pgsockfd, uint32_t dip)
