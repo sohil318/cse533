@@ -81,14 +81,23 @@ int main()
 				{
 					 printf("No entry in cache for %s. Creating an incomplete entry.\n", recvarq->ip_addr);
 					// Add a new incomplete entry
-					// Prepare a req header
+				        add_entry(recvarq , connfd); 
+                                        // Prepare a req header
 					// Send ARP REQ
 				}
 			}
 			// If something is recieved on the connfd
 			if(connfd>-1 && FD_ISSET(connfd, &rset)){
-				
-			}
+				// delete incomplete entry on timeout
+		                printf("Recieved something in connfd.\n");
+                                int bytes_read = Read(connfd, recvBuff, sizeof(recvBuff));
+                                if (bytes_read == 0){
+                                        printf("Timeout detected. Connection closed by tour client.\n");        
+                                        delete_cache_entry(connfd);
+                                        Close(connfd);
+                                        connfd = -1;
+                                }
+                        }
         	}
  
 		return 0;
