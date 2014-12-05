@@ -95,14 +95,14 @@ void printTourPacket(tpayload packet)
         int i = 0;
         struct in_addr addr;
         char *ip;
-        printf("Curr IP index : %d, Tour Size : %d, Multicast port : %d, Multicast IP : %s, List of IP's : ", packet.next_ip_idx, packet.tour_size, packet.multi_port, packet.multi_ip);
+        printf("Tour Packet Contents <<<< Curr IP index : %d, Tour Size : %d, Multicast port : %d, Multicast IP : %s, List of IP's : ", packet.next_ip_idx, packet.tour_size, packet.multi_port, packet.multi_ip);
         for ( i = 0; i < packet.tour_size; i++)
         {
                 addr.s_addr = packet.ip_addrs[i];
                 ip = inet_ntoa(addr);
                 printf("%s;",ip); 
         }
-        printf("\n");
+        printf(">>>> \n");
 }
 
 /* Get IP Address by Index from tour packet */
@@ -138,14 +138,14 @@ void send_tour_packet(int rtsockfd, tpayload *packet, int userlen)
         sip = getIPaddrbyIdx(packet, packet->next_ip_idx);            /* Get Source IP address */
         addr.s_addr = sip;
         strcpy(src_ip, inet_ntoa(addr));
-        printf("Src IP : %s\n", src_ip); 
+        //printf("Src IP : %s\n", src_ip); 
         
         packet->next_ip_idx++;                                          /* Increment IP Index of packet payload */  
         
         dip = getIPaddrbyIdx(packet, packet->next_ip_idx);            /* Get Destination IP address */
         addr.s_addr = dip;
         strcpy(dst_ip, inet_ntoa(addr));
-        printf("Dest IP : %s\n", dst_ip); 
+        //printf("Dest IP : %s\n", dst_ip); 
 
         userlen += sizeof(struct ip);
         memset(buf, 0, userlen);
@@ -174,8 +174,6 @@ void send_tour_packet(int rtsockfd, tpayload *packet, int userlen)
         memcpy((void *)tourpacket, (void *)packet, sizeof(tpayload));
         ip->ip_sum = htons(csum((unsigned short *)buf, userlen));
         
-        printf("Tour Data Packet: %s\n", tourpacket); 
-
         dest.sin_addr.s_addr = dip;
         dest.sin_family      = AF_INET;
 
@@ -197,6 +195,24 @@ void addtomulticastgroup(int sockfd, char *ip)
         Mcast_join(sockfd, (const SA *)&addr, sizeof(addr), NULL, 0);
 
 }
+
+/* Send Multicast Message */
+void sendMulticastPacket(int multisockfd, char * mcast_msg, int mport, char *mip)
+{
+        char multi_ip[IP_SIZE], vm_name[HOST_SIZE];
+        struct sockaddr_in dest;
+        
+        strcpy(multi_ip, mip);
+        dest.sin_family      =  AF_INET;
+        dest.sin_port        =  htons(mport);
+        inet_pton(AF_INET, multi_ip, &dest.sin_addr);
+        
+        gethostname(vm_name, sizeof(vm_name));
+        printf("Node %s. Sending   %s\n", vm_name, mcast_msg);
+         
+	Sendto(multisockfd, mcast_msg, MSG_SIZE, 0, (SA *)&dest, sizeof(dest));
+}
+
 
 /* Handle Incoming Tour IP RAW Packet */
 void handletourpacket(int rtsockfd, int multisockfd, int pgsockfd)
@@ -255,16 +271,39 @@ void handletourpacket(int rtsockfd, int multisockfd, int pgsockfd)
 
         if (data->next_ip_idx + 1 == data->tour_size)
         {
+                data->next_ip_idx++;
                 sprintf(mcast_msg, "<<<<<<<<<<<<<< This is node %s. Tour has ended. Group Members please identify yourselves. >>>>>>>>>>", vm_name);
                 printf("%s\n", mcast_msg); 
+                sendMulticastPacket(multisockfd, mcast_msg, data->multi_port, data->multi_ip);
         }                
         else
         {
                 send_tour_packet(rtsockfd, data, sizeof(tpayload)); 
         }
-
 }
 
+/* Handle Incoming Multicast packet */
+void handlemultipacket(int multisockfd)
+{
+        char buff[IP_PACK_SIZE], src_ip[IP_SIZE], vm_name[HOST_SIZE], mcast_msg[MSG_SIZE];
+        struct sockaddr_in mcast_addr;
+        int len = sizeof(mcast_addr);
+       
+        Recvfrom(multisockfd, (void *)buff, IP_PACK_SIZE, 0, (SA *)&mcast_addr, &len);
+        
+        gethostname(vm_name, sizeof(vm_name));
+        printf("Node %s. Received  %s\n", vm_name, buff);
+
+        sprintf(mcast_msg, "<<<<< Node %s. I am member of group. >>>>>", vm_name);
+        sendMulticastPacket(multisockfd, mcast_msg, MCAST_PORT, MCAST_IP);
+
+        for (;;)
+        {
+                Recvfrom(multisockfd, (void *)buff, IP_PACK_SIZE, 0, (SA *)&mcast_addr, &len);
+                gethostname(vm_name, sizeof(vm_name));
+                printf("Node %s. Received  %s\n", vm_name, buff);
+        }
+}
 
 int main(int argc, char *argv[])
 {
@@ -280,7 +319,7 @@ int main(int argc, char *argv[])
         if((createSocket(&pfsockfd, &rtsockfd, &pgsockfd, &multisockfd)) == -1)
                 return 0;
         
-        printf("Multisockfd %d, pfsockfd %d, rtsockfd %d, pgsockfd %d\n", multisockfd, pfsockfd, rtsockfd, pgsockfd);
+//        printf("Multisockfd %d, pfsockfd %d, rtsockfd %d, pgsockfd %d\n", multisockfd, pfsockfd, rtsockfd, pgsockfd);
 
         if (argc > 1)
         {
@@ -345,9 +384,11 @@ int main(int argc, char *argv[])
 		}
 		if (FD_ISSET(pgsockfd, &rset)) {	/* socket is readable */
 	        //        n = readline(sockFD, recvline, MAXBUF);
+
 		}
 		if (FD_ISSET(multisockfd, &rset)) {	/* socket is readable */
 	        //        n = readline(sockFD, recvline, MAXBUF);
+                        handlemultipacket(multisockfd);
 		}
 
         }
