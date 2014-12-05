@@ -30,7 +30,8 @@ uint32_t getIPaddrbyIdx(tpayload *packet, int idx);
 unsigned short csum(unsigned short *buf, int nwords);
 void send_tour_packet(int rtsockfd, tpayload *packet, int userlen);
 void addtomulticastgroup(int sockfd, char *ip);
+void sendMulticastPacket(int multisockfd, char * mcast_msg, int mport, char *mip);
 void handletourpacket(int rtsockfd, int multisockfd, int pgsockfd);
+void handlemultipacket(int multisockfd);
 
 #endif  /* __TOUR_h */
-
