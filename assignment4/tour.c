@@ -1,12 +1,18 @@
 #include        "utils.h"
 #include 	"tour.h"
+#include	"hw_addrs.h"
 #include        <stdlib.h>
 #include        <linux/if_ether.h>
 #include        <netinet/ip.h>
+#include        <netinet/ip_icmp.h>
+#include        <sys/socket.h>
+#include        <linux/if_packet.h>
 #include        <stdio.h>
 #include        <time.h>
 
 int visited = 0;
+int ifaceIdx = 2;
+int pinged_vm[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 /* Create 4 Sockets for the tour application */
 int createSocket(int *pfsockfd, int *rtsockfd, int *pgsockfd, int *multisockfd)
@@ -213,10 +219,280 @@ void sendMulticastPacket(int multisockfd, char * mcast_msg, int mport, char *mip
 	Sendto(multisockfd, mcast_msg, MSG_SIZE, 0, (SA *)&dest, sizeof(dest));
 }
 
+/* Get VM number */
+int get_vm_index(uint32_t ip)
+{
+        int idx;
+        struct in_addr taddr;
+        taddr.s_addr = ip;
+        const char *str = inet_ntoa(taddr);
+        idx = str[13] - (int)'0';
+        return idx;
+}
+
+/* Get Host MAC Address */
+char* getSrcMacAddr()
+{
+        struct hwa_info	*hwa, *hwahead;
+        char   *ptr = NULL, *hptr;
+        int    i, prflag;
+
+        hptr = (void *)malloc(MAC_SIZE);
+
+        for (hwahead = hwa = Get_hw_addrs(); hwa != NULL; hwa = hwa->hwa_next) {
+
+                if (strcmp(hwa->if_name, "eth0") == 0)  
+                {
+                        ifaceIdx = hwa->if_index;
+                        prflag = 0;
+                        i = 0;
+                        do {
+                                if (hwa->if_haddr[i] != '\0') {
+                                        prflag = 1;
+                                        break;
+                                }
+                        } while (++i < IF_HADDR);
+
+                        if (prflag) {
+                                printf("         HW addr = ");
+                                ptr = hwa->if_haddr;
+                                memcpy(hptr, hwa->if_haddr, MAC_SIZE);
+                        }
+                        return hptr;
+                }
+        }
+
+        return NULL;
+}
+
+/* Print Mac Address */
+void printmac(char *mac)
+{
+        char *ptr = mac;
+        int i = IF_HADDR;
+        do {
+                printf("%.2x%s", *ptr++ & 0xff, (i == 1) ? " " : ":");
+        } while (--i > 0);
+
+}
+
+/* Get Source IP Address */
+uint32_t getsrcipaddr()
+{
+        struct hostent *hp;
+        char hostname[HOST_SIZE];
+
+        gethostname(hostname, sizeof(hostname));
+        hp = (struct hostent *)gethostbyname((const char *)hostname);	
+
+        return ((struct in_addr *)hp->h_addr_list[0])->s_addr;
+}
+
+/* Send echo request */
+int send_ping_req(int pfsockfd, int pgsockfd, uint32_t dip)
+{
+        printf("Create and Send Ping Request\n");
+        uint32_t sip; 
+        int datalen = 4;
+        char datac[4] = {'a', 'b', 'c', 'd'};
+        char src_mac[MAC_SIZE], dst_mac[MAC_SIZE];
+        struct icmp *icmppkt;
+        struct ip *ip;
+        
+        memcpy(src_mac, getSrcMacAddr(), MAC_SIZE);                                             /*      Get Source MAC Address                          */
+        printf("Step 1. \n");
+        printf("Source Mac : "); 
+        printf("Step 2. \n");
+        printmac(src_mac);
+        printf("Step 3. \n");
+        printf("\n");
+                                                                                                /*      TODO : Get Dest MAC Address                     */
+        sip = getsrcipaddr();
+        send_v4(icmppkt);
+
+        int send_result = 0;
+        struct sockaddr_ll socket_address;                                                      /*      target address                                  */
+        void* buffer = (void*)malloc(ETHR_FRAME_LEN);                                           /*      buffer for ethernet frame                       */
+        memset(buffer, 0, ETHR_FRAME_LEN);
+
+        unsigned char* etherhead = buffer;                                                      /*      pointer to ethenet header                       */
+        unsigned char* ipheader  = buffer + 14;                                                 /*      ip header in ethernet frame                     */  
+        unsigned char* icmphead  = buffer + 14 + sizeof(struct ip);                             /*      userdata in ethernet frame                      */  
+        unsigned char* data      = buffer + 14 + sizeof(struct ip) + sizeof(struct icmp);       /*      userdata in ethernet frame                      */  
+
+        struct ethhdr *eh = (struct ethhdr *)etherhead;                                         /*      another pointer to ethernet header              */
+
+        /*      Prepare sockaddr_ll     */
+        socket_address.sll_family   =   PF_PACKET;                                              /*      RAW communication                               */  
+        socket_address.sll_protocol =   htons(ETH_P_IP);                                        /*      We don't use a protocoll above ethernet layer just use anything here.  */
+        socket_address.sll_ifindex  =   ifaceIdx;                                               /*      Interface Index of the network device in function parameter     */
+
+        
+        socket_address.sll_hatype   =   ARPHRD_ETHER;                                           /*      ARP hardware identifier is ethernet             */  
+        
+        socket_address.sll_pkttype  =   PACKET_OTHERHOST;                                       /*      Target is another host.                         */  
+
+        socket_address.sll_halen    =   MAC_SIZE;                                               /*      Address length                                  */
+
+        /*      MAC - begin     */
+        socket_address.sll_addr[0]  =   dst_mac[0];             
+        socket_address.sll_addr[1]  =   dst_mac[1];             
+        socket_address.sll_addr[2]  =   dst_mac[2];  
+        socket_address.sll_addr[3]  =   dst_mac[3];  
+        socket_address.sll_addr[4]  =   dst_mac[4];
+        socket_address.sll_addr[5]  =   dst_mac[5];
+        /*      MAC - end       */
+
+        socket_address.sll_addr[6]  =   0x00;                                                   /*      not used                                        */
+        socket_address.sll_addr[7]  =   0x00;                                                   /*      not used                                        */      
+
+        memcpy((void*)buffer, (void*)dst_mac, MAC_SIZE);                                        /*      Set Dest Mac in the ethernet frame header       */
+        memcpy((void*)(buffer + MAC_SIZE), (void*)src_mac, MAC_SIZE);                           /*      Set Src Mac in the ethernet frame header        */  
+        eh->h_proto = htons(ETH_P_IP);
+
+        /* Fill Contents of IP Packet */
+	ip = (struct ip *) ipheader;
+
+	/* 4ip_output() calcuates & stores IP header checksum */
+	ip->ip_src.s_addr = sip;
+	ip->ip_dst.s_addr = dip;
+	ip->ip_v = IPVERSION;
+	ip->ip_hl = sizeof(struct ip) >> 2;
+	ip->ip_tos = 0;
+        
+        int len = sizeof(struct ip) + sizeof(struct icmp) + datalen;
+
+	ip->ip_len = htons(len);	/* network byte order */
+	ip->ip_id  = htons(IP_IDENT);			/* let IP set this */
+	ip->ip_off = 0;			/* frag offset, MF and DF flags */
+	ip->ip_ttl = 1;
+        ip->ip_p   = IPPROTO_ICMP; 
+        ip->ip_sum = htons(0);
+        
+        memcpy((void *)icmphead, (void *)icmppkt, sizeof(struct icmp));
+
+        //ip->ip_sum = htons(csum((unsigned short *)buf, userlen));
+
+        memcpy((void *)data, (void *)datac, datalen);                                           /*      Fill the frame with ODR Packet                  */
+        
+        /*send the packet*/
+        send_result = sendto(pfsockfd, buffer, ETHR_FRAME_LEN, 0, (struct sockaddr *) &socket_address, sizeof(socket_address));
+
+}
+
+void proc_v4(char *ptr, ssize_t len, struct msghdr *msg, struct timeval *tvrecv)
+{
+	int				hlen1, icmplen;
+	double			rtt;
+	struct ip		*ip;
+	struct icmp		*icmp;
+	struct timeval	*tvsend;
+        struct in_addr  iaddr;
+        struct hostent *he;
+
+	ip = (struct ip *) ptr;		/* start of IP header */
+	hlen1 = ip->ip_hl << 2;		/* length of IP header */
+	if (ip->ip_p != IPPROTO_ICMP)
+		return;				/* not ICMP */
+
+	icmp = (struct icmp *) (ptr + hlen1);	/* start of ICMP header */
+	if ( (icmplen = len - hlen1) < 8)
+		return;				/* malformed packet */
+
+	if (icmp->icmp_type == ICMP_ECHOREPLY) {
+		if (icmp->icmp_id != IP_IDENT)
+			return;			/* not a response to our ECHO_REQUEST */
+//		if (icmplen < 16)
+//			return;			/* not enough data to use */
+
+		tvsend = (struct timeval *) icmp->icmp_data;
+		tv_sub(tvrecv, tvsend);
+		rtt = tvrecv->tv_sec * 1000.0 + tvrecv->tv_usec / 1000.0;
+
+                he = (struct hostent *)malloc(sizeof(struct hostent));
+
+                iaddr.s_addr = ip->ip_src.s_addr;
+                he = gethostbyaddr(&iaddr, sizeof(iaddr), AF_INET);
+                
+		printf("%d bytes from %s: seq=%u, ttl=%d, rtt=%.3f ms\n",
+				icmplen, he->h_name,
+				icmp->icmp_seq, ip->ip_ttl, rtt);
+	}
+}
+
+
+/* Receive Ping/Echo replies */
+void recv_ping_rep(int pgsockfd)
+{
+        struct sockaddr_in recvaddr;
+        struct msghdr msg;
+        struct timeval tvrecv;
+        int len = sizeof(recvaddr);
+        char recvbuf[ETHR_FRAME_LEN];
+        
+        bzero(&recvaddr, sizeof(struct sockaddr_in));
+        
+        Recvfrom(pgsockfd, (void *)recvbuf, ETHR_FRAME_LEN, 0, (SA *)&recvaddr, &len);
+        
+        Gettimeofday(&tvrecv, NULL);
+
+        proc_v4(recvbuf + 14, sizeof(recvbuf) - 14, &msg, &tvrecv);
+        
+}
+
+
+/* Handle 5 echo request reply sequences for the last packet in tour */
+void handle_final_pings(int pfsockfd, int pgsockfd, uint32_t dip)
+{
+        printf("Handle Last 5 Pings.\n");
+        int     maxfdpl, nready, i;
+        fd_set  rset, allset;
+        struct timeval tv;
+
+        FD_ZERO(&allset);
+        FD_ZERO(&rset);
+	
+        FD_SET(pgsockfd, &allset);
+        
+        maxfdpl = pgsockfd;
+
+	for (i = 0 ; i < 5; i++ ) 
+        {
+                tv.tv_sec = 1;
+                tv.tv_usec = 0;
+                rset = allset;
+
+                nready = select(maxfdpl + 1, &rset, NULL, NULL, &tv); 
+	        if (nready < 0)
+                {
+                        if (errno == EINTR)
+                        {
+                                printf("EINTR error !\n");
+                                continue;
+                        }
+                        else
+                        {
+		                perror("select error");
+                                exit (0);
+                        }
+                }
+                if (nready == 0)                {
+                        printf("1 Second completed. Send Next Ping.\n");
+                        //send_all_ping_req(pfsockfd, pgsockfd);
+                }
+		if (FD_ISSET(pgsockfd, &rset))  {	/* socket is readable */
+                        recv_ping_rep(pgsockfd);
+                        //send_ping_req(pfsockfd, pgsockfd, dip);
+		}
+        }
+        
+}
+
 
 /* Handle Incoming Tour IP RAW Packet */
-void handletourpacket(int rtsockfd, int multisockfd, int pgsockfd)
+void handletourpacket(int rtsockfd, int multisockfd, int pgsockfd, int pfsockfd)
 {
+        int idx, datalen = 56;
         char buff[IP_PACK_SIZE], src_ip[IP_SIZE], vm_name[HOST_SIZE], mcast_msg[MSG_SIZE];
         struct sockaddr_in addr, mcast_addr;
         struct in_addr  iaddr;
@@ -255,6 +531,21 @@ void handletourpacket(int rtsockfd, int multisockfd, int pgsockfd)
         {
                 visited = 1;
 
+                /* Pinging Sender Node */
+                idx = get_vm_index(packhead->ip_src.s_addr);
+                printf("Current Index : %d\n", idx);
+
+                if (pinged_vm[idx] == 0)
+                {
+                        struct in_addr taddr;
+                        taddr.s_addr = packhead->ip_src.s_addr;
+                        const char *str = inet_ntoa(taddr);
+
+	                printf("PING %s: %d data bytes\n", str, datalen);
+                        pinged_vm[idx] = 1;
+                        //send_ping_req(pfsockfd, pgsockfd, packhead->ip_src.s_addr);
+                }
+                
                 /* Add to Multicast Group */
                 bzero(&mcast_addr, sizeof(struct sockaddr_in));
                 mcast_addr.sin_family           =       AF_INET;
@@ -265,12 +556,36 @@ void handletourpacket(int rtsockfd, int multisockfd, int pgsockfd)
 
                 /* TODO : Add to Multicast Group */
                 printf("Adding %s to multicast group.\n", vm_name);
-                addtomulticastgroup(multisockfd, data->multi_ip);
-                
+                addtomulticastgroup(multisockfd, data->multi_ip);   
+        }
+        else
+        {
+                /* Pinging Sender Node */
+                idx = get_vm_index(packhead->ip_src.s_addr);
+                printf("Current Index : %d\n", idx);
+
+                if (pinged_vm[idx] == 0)
+                {
+                        struct in_addr taddr;
+                        taddr.s_addr = packhead->ip_src.s_addr;
+                        const char *str = inet_ntoa(taddr);
+
+	                printf("PING %s: %d data bytes\n", str, datalen);
+                        pinged_vm[idx] = 1;
+                        //send_ping_req(pfsockfd, pgsockfd, packhead->ip_src.s_addr);
+                }
+
         }
 
         if (data->next_ip_idx + 1 == data->tour_size)
         {
+                struct in_addr taddr;
+                taddr.s_addr = packhead->ip_src.s_addr;
+                const char *str = inet_ntoa(taddr);
+
+                printf("PING %s: %d data bytes\n", str, datalen);
+                handle_final_pings(pfsockfd, pgsockfd, packhead->ip_src.s_addr);
+                
                 data->next_ip_idx++;
                 sprintf(mcast_msg, "<<<<<<<<<<<<<< This is node %s. Tour has ended. Group Members please identify yourselves. >>>>>>>>>>", vm_name);
                 printf("%s\n", mcast_msg); 
@@ -305,6 +620,62 @@ void handlemultipacket(int multisockfd)
         }
 }
 
+void send_v4(struct icmp *icmp)
+{
+	int			len;
+//	struct icmp	*icmp;
+
+//	icmp = (struct icmp *) malloc (sizeof(struct icmp));
+	icmp->icmp_type = ICMP_ECHO;
+	icmp->icmp_code = 0;
+	icmp->icmp_id = IP_IDENT;
+	icmp->icmp_seq = 0;
+	//memset(icmp->icmp_data, 0xa5, datalen);	/* fill with pattern */
+	//Gettimeofday((struct timeval *) icmp->icmp_data, NULL);
+
+	//len = 8 + datalen;		/* checksum ICMP header and data */
+	//icmp->icmp_cksum = 0;
+	//icmp->icmp_cksum = in_cksum((u_short *) icmp, len);
+        //sendechoreq();
+	//Sendto(sockfd, sendbuf, len, 0, pr->sasend, pr->salen);
+}
+
+/* Send ping requests every second */
+void send_all_ping_req(int pfsockfd, int pgsockfd)
+{
+        int i = 0, datalen = 56;
+        char hostname[HOST_SIZE], *str;
+        uint32_t ipaddr;
+        struct in_addr taddr;
+        struct hostent *hp;
+
+        for (i = 0; i < 10; i++)
+        {
+                if (pinged_vm[i] == 1)
+                {
+                        if (i == 0)
+                                sprintf(hostname, "vm%d", 10);
+                        else
+                                sprintf(hostname, "vm%d", i);
+                }
+                
+                hp = (struct hostent *)gethostbyname((const char *)hostname);	
+                ipaddr = ((struct in_addr *)hp->h_addr_list[0])->s_addr;
+                taddr.s_addr = ipaddr;
+                strcpy(str, inet_ntoa(taddr));
+
+                printf("PING %s: %d data bytes\n", str, datalen);
+                //send_ping_req(pfsockfd, pgsockfd, ipaddr);
+        }
+}
+
+/* Handle Ping Repies */
+void handlepingreply(int pgsockfd)
+{
+        printf("Handling Echo Replies \n");
+        recv_ping_rep(pgsockfd);
+}
+
 int main(int argc, char *argv[])
 {
 //      printf("\nTour Main");
@@ -336,7 +707,6 @@ int main(int argc, char *argv[])
 
                 Bind(multisockfd, (SA *)&mcast_addr, sizeof(mcast_addr));
 
-                /* TODO : Add to Multicast Group */
                 addtomulticastgroup(multisockfd, MCAST_IP);
 
                 /* Send Tour packet thru Tour IP RAW Socket */
@@ -346,6 +716,7 @@ int main(int argc, char *argv[])
 
         int     maxfdpl, nready;
         fd_set  rset, allset;
+        struct timeval tv;
 
         FD_ZERO(&allset);
         FD_ZERO(&rset);
@@ -363,7 +734,11 @@ int main(int argc, char *argv[])
 
 	for ( ; ; ) 
         {
-		rset = allset;
+                tv.tv_sec = 1;
+                tv.tv_usec = 0;
+                rset = allset;
+
+                //nready = select(maxfdpl + 1, &rset, NULL, NULL, &tv); 
                 nready = select(maxfdpl + 1, &rset, NULL, NULL, NULL); 
 	        if (nready < 0)
                 {
@@ -378,16 +753,17 @@ int main(int argc, char *argv[])
                                 exit (0);
                         }
                 }
-		if (FD_ISSET(rtsockfd, &rset)) {	/* socket is readable */
-                //        printf("Received Tour packet.\n");
-                        handletourpacket(rtsockfd, multisockfd, pgsockfd);
+                if (nready == 0)                {
+                        printf("1 Second completed. Send Next Ping.\n");
+                        //send_all_ping_req(pfsockfd, pgsockfd);
+                }
+		if (FD_ISSET(rtsockfd, &rset))  {	/* socket is readable */
+                        handletourpacket(rtsockfd, multisockfd, pgsockfd, pfsockfd);
 		}
-		if (FD_ISSET(pgsockfd, &rset)) {	/* socket is readable */
-	        //        n = readline(sockFD, recvline, MAXBUF);
-
+		if (FD_ISSET(pgsockfd, &rset))  {	/* socket is readable */
+                        handlepingreply(pgsockfd);
 		}
 		if (FD_ISSET(multisockfd, &rset)) {	/* socket is readable */
-	        //        n = readline(sockFD, recvline, MAXBUF);
                         handlemultipacket(multisockfd);
 		}
 
