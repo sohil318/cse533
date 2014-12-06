@@ -20,6 +20,7 @@ struct hwa_info * getMacAddr()
 
                 if (strcmp(hwa->if_name, "eth0") == 0)  
                 {
+                        ifaceIdx = hwa->if_index;
                         return hwa;
                 }
         }
@@ -47,8 +48,30 @@ arp_pack * create_areq_packet(struct writeArq * arq)
         return packet;
 }
 
+/*  Create ARP Packet */
+arp_pack * create_arep_packet(arp_pack * arq)
+{
+
+        char ip[IP_SIZE];
+//        struct sockaddr_in * ad = (struct sockaddr_in *)info->ip_addr;
+        arp_pack *packet = (arp_pack *)malloc(sizeof(arp_pack));
+        
+        packet->type  = htons(AREP);
+        packet->proto_id  =  htons(IPPROTO_ID);
+        packet->hatype  =   htonl(arq->hatype);
+        
+        strcpy(packet->src_mac, info->if_haddr);
+        
+//        inet_ntop(AF_INET, &(ad->sin_addr), ip, 50);
+        strcpy(packet->src_ip, arq->dest_ip);
+        strcpy(packet->dest_ip, arq->src_ip);
+        strcpy(packet->dest_mac, arq->src_mac);
+        return packet;
+}
+
+
 /*  Send an ARP Request     */
-void sendARPReq(int sockfd, arp_pack *packet, char *src_mac, char *dst_mac, int ifaceidx)
+void sendARP(int sockfd, arp_pack *packet, char *src_mac, char *dst_mac, int ifaceidx)
 {
         int send_result = 0;
         char hostname[HOST_SIZE];
@@ -156,7 +179,7 @@ void floodARPReq(int pfsockfd, struct writeArq* arq)
 
 	char dst_mac[6]  = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
         
-        sendARPReq(pfsockfd, packet, packet->src_mac, dst_mac, info->if_index);
+        sendARP(pfsockfd, packet, packet->src_mac, dst_mac, info->if_index);
 }
 
 /* Print Mac Address */
@@ -173,7 +196,26 @@ void printmac(char *mac)
 /* Handle AREQ */
 void handleAREQPacket(int pfsockfd, char * src_mac, char * dst_mac, arp_pack *packet, int ifaceidx)
 {
+        char my_ip[IP_SIZE];
+        arp_pack *arep;
+        cache *entry = (cache *)find_in_cache(packet->src_ip);
+
+        if (entry != NULL)
+        {
+                printf("Updating Cache for mac ::::::");
+                printmac(entry->hw_addr);
+                printf("\n");
+
+        }
+        struct sockaddr_in * ad = (struct sockaddr_in *)info->ip_addr;
         
+        inet_ntop(AF_INET, &(ad->sin_addr), my_ip, 50);
+
+        if (strcmp(packet->dest_ip, my_ip) == 0)
+        {
+                arep = create_arep_packet(packet);
+                sendARP(pfsockfd, arep, arep->src_mac, arep->dest_mac, ifaceIdx);
+        }        
 }
 
 /* Handle AREP */
@@ -286,7 +328,7 @@ int main()
         // Print the address pairs found
         info = getMacAddr();   
         struct sockaddr_in * ad = (struct sockaddr_in *)info->ip_addr; 
-        printf("IP Address : %ld  |   HW Address : %s \n ", ad->sin_addr.s_addr ,info->if_haddr);
+        printf("IP Address : %s  |   HW Address : %s \n ", inet_ntoa(ad->sin_addr) ,info->if_haddr);
 
 	FD_ZERO(&rset);
 

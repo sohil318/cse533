@@ -308,7 +308,7 @@ int send_ping_req(int pfsockfd, int pgsockfd, uint32_t dip)
         char src_mac[MAC_SIZE], dst_mac[MAC_SIZE];
         struct icmp *icmppkt;
         struct ip *ip;
-        struct hwaddr *HWaddr;
+        struct hwaddr HWaddr;
 
         memcpy(src_mac, getSrcMacAddr(), MAC_SIZE);                                             /*      Get Source MAC Address                          */
         printf("Step 1. \n");
@@ -318,9 +318,9 @@ int send_ping_req(int pfsockfd, int pgsockfd, uint32_t dip)
         printf("Step 3. \n");
         printf("\n");
         
-        getDestMac(dip, HWaddr);                                                                /*      TODO : Get Dest MAC Address                     */
+        getDestMac(dip, &HWaddr);                                                                /*      TODO : Get Dest MAC Address                     */
         
-        memcpy(dst_mac, HWaddr->sll_addr, MAC_SIZE);
+        memcpy(dst_mac, HWaddr.sll_addr, MAC_SIZE);
         sip = getsrcipaddr();
         send_v4(icmppkt);
 

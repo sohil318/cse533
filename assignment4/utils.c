@@ -71,17 +71,18 @@ int add_entry(struct writeArq arq , int connfd)
 	new->hatype = arq.hw.sll_hatype;
 	new->connfd= connfd;
         new->incomplete = 1;
+        new->next = NULL;
 
 	if(arq.hw.sll_addr)
 	{
 	        new->incomplete=0;
                 memcpy(new->hw_addr,arq.hw.sll_addr,6);
 	}
-
-	new->next= cache_head;
+        if (cache_head != NULL)
+	        new->next= cache_head;
 	cache_head= new;
 	
-	dprintf("added ip: %s\n",new->ip_addr);
+	printf("added ip: %s\n",new->ip_addr);
 	return 0;
 
 }
