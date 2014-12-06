@@ -41,6 +41,7 @@ arp_pack * create_areq_packet(struct writeArq * arq)
         packet->hatype  =   arq->hw.sll_hatype;
         
         memcpy(packet->src_mac, info->if_haddr, 6);
+        memset(packet->dest_mac, 0xFF, 6);
         
         inet_ntop(AF_INET, &(ad->sin_addr), ip, 50);
         strcpy(packet->src_ip, ip);
@@ -302,13 +303,13 @@ void handleARPPackets(int pfsockfd, int connfd)
         if (packet->type == AREQ)
         {
                 gethostname(hostname, sizeof(hostname));
-                printf("\nIncoming AREQ on %s", hostname);
+                printf("\nIncoming AREQ on %s\n", hostname);
                 handleAREQPacket(pfsockfd, src_mac, dst_mac, packet, ifaceidx);
         }
         else if (packet->type == AREP)
         {
                 gethostname(hostname, sizeof(hostname));
-                printf("\nIncoming AREP on %s", hostname);
+                printf("\nIncoming AREP on %s\n", hostname);
                 handleAREPPacket(pfsockfd, src_mac, dst_mac, packet, ifaceidx, connfd);
         }
 
@@ -421,7 +422,7 @@ int main()
 			// If something is recieved on the connfd
 			if(connfd > -1 && FD_ISSET(connfd, &rset)){
 				// delete incomplete entry on timeout
-		                printf("Recieved something in connfd.\n");
+		             //   printf("Recieved something in connfd.\n");
                                 int bytes_read = Read(connfd, recvBuff, sizeof(recvBuff));
                                 if (bytes_read == 0){
                                         printf("Timeout detected. Connection closed by tour client.\n");        

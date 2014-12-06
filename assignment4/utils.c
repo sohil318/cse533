@@ -42,7 +42,7 @@ int areq (struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr)
 	select(sockfd+1, &rset, NULL, NULL, &tv);	
 	
 	if(FD_ISSET(sockfd, &rset)){
-		read(sockfd, mac, sizeof(mac));
+		int n = read(sockfd, mac, sizeof(mac));
 	        memcpy(HWaddr->sll_addr, mac, 6);
 	}
 	else{
