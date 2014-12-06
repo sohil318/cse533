@@ -304,10 +304,7 @@ int send_ping_req(int pfsockfd, int pgsockfd, uint32_t dip)
 {
         printf("Create and Send Ping Request\n");
         uint32_t sip; 
-        int datalen = 4;
-        char datac[4] = {'a', 'b', 'c', 'd'};
         char src_mac[MAC_SIZE], dst_mac[MAC_SIZE];
-        struct icmp icmppkt;
         struct ip *ip;
         struct hwaddr HWaddr;
 
@@ -322,8 +319,8 @@ int send_ping_req(int pfsockfd, int pgsockfd, uint32_t dip)
         memcpy(dst_mac, HWaddr.sll_addr, MAC_SIZE);
         printmac(dst_mac);
         printf("\n");
+
         sip = getsrcipaddr();
-        send_v4(&icmppkt);
         
         int send_result = 0;
         struct sockaddr_ll socket_address;                                                      /*      target address                                  */
@@ -332,8 +329,8 @@ int send_ping_req(int pfsockfd, int pgsockfd, uint32_t dip)
 
         unsigned char* etherhead = buffer;                                                      /*      pointer to ethenet header                       */
         unsigned char* ipheader  = buffer + 14;                                                 /*      ip header in ethernet frame                     */  
-        unsigned char* icmphead  = buffer + 14 + sizeof(struct ip);                             /*      userdata in ethernet frame                      */  
-        unsigned char* data      = buffer + 14 + sizeof(struct ip) + sizeof(struct icmp);       /*      userdata in ethernet frame                      */  
+        struct icmp* icmphead  = buffer + 14 + sizeof(struct ip);                             /*      userdata in ethernet frame                      */  
+        //unsigned char* data      = buffer + 14 + sizeof(struct ip) + sizeof(struct icmp);       /*      userdata in ethernet frame                      */  
 
         struct ethhdr *eh = (struct ethhdr *)etherhead;                                         /*      another pointer to ethernet header              */
 
@@ -365,6 +362,7 @@ int send_ping_req(int pfsockfd, int pgsockfd, uint32_t dip)
         memcpy((void*)(buffer + MAC_SIZE), (void*)src_mac, MAC_SIZE);                           /*      Set Src Mac in the ethernet frame header        */  
         eh->h_proto = htons(ETH_P_IP);
 
+        send_v4(icmphead);
         /* Fill Contents of IP Packet */
 	ip = (struct ip *) ipheader;
 
@@ -375,27 +373,21 @@ int send_ping_req(int pfsockfd, int pgsockfd, uint32_t dip)
 	ip->ip_hl = sizeof(struct ip) >> 2;
 	ip->ip_tos = 0;
         
-        int len = sizeof(struct ip) + sizeof(struct icmp) + datalen;
+        int len = sizeof(struct ip) + sizeof(struct icmp);
 
 	ip->ip_len = htons(len);	/* network byte order */
 	ip->ip_id  = htons(IP_IDENT);			/* let IP set this */
 	ip->ip_off = 0;			/* frag offset, MF and DF flags */
-	ip->ip_ttl = 1;
+	ip->ip_ttl = 64;
         ip->ip_p   = IPPROTO_ICMP; 
-        ip->ip_sum = htons(0);
-        
-        memcpy((void *)icmphead, (void *)&icmppkt, sizeof(struct icmp));
-
-        //ip->ip_sum = htons(csum((unsigned short *)buf, userlen));
-
-        memcpy((void *)data, (void *)datac, datalen);                                           /*      Fill the frame with ODR Packet                  */
+	ip->ip_sum = in_cksum((u_short *) ip, sizeof(struct ip) + sizeof(struct icmp));
         
         /*send the packet*/
         send_result = sendto(pfsockfd, buffer, ETHR_FRAME_LEN, 0, (struct sockaddr *) &socket_address, sizeof(socket_address));
 
 }
 
-void proc_v4(char *ptr, ssize_t len, struct msghdr *msg, struct timeval *tvrecv)
+void proc_v4(char *ptr, ssize_t len, struct timeval *tvrecv)
 {
 	int				hlen1, icmplen;
 	double			rtt;
@@ -407,18 +399,12 @@ void proc_v4(char *ptr, ssize_t len, struct msghdr *msg, struct timeval *tvrecv)
 
 	ip = (struct ip *) ptr;		/* start of IP header */
 	hlen1 = ip->ip_hl << 2;		/* length of IP header */
-	if (ip->ip_p != IPPROTO_ICMP)
-        {
-                printf("Rejecting ICMP Reply. Not Mine. \n");
-		return;				/* not ICMP */
-        }
 
 	icmp = (struct icmp *) (ptr + hlen1);	/* start of ICMP header */
 	if ( (icmplen = len - hlen1) < 8)
 		return;				/* malformed packet */
 
-	if (icmp->icmp_type == ICMP_ECHOREPLY) {
-		if (icmp->icmp_id != IP_IDENT)
+		if (ntohs(icmp->icmp_id) != IP_IDENT)
 			return;			/* not a response to our ECHO_REQUEST */
 //		if (icmplen < 16)
 //			return;			/* not enough data to use */
@@ -434,8 +420,7 @@ void proc_v4(char *ptr, ssize_t len, struct msghdr *msg, struct timeval *tvrecv)
                 
 		printf("%d bytes from %s: seq=%u, ttl=%d, rtt=%.3f ms\n",
 				icmplen, he->h_name,
-				icmp->icmp_seq, ip->ip_ttl, rtt);
-	}
+				ntohs(icmp->icmp_seq), ip->ip_ttl, rtt);
 }
 
 
@@ -448,13 +433,12 @@ void recv_ping_rep(int pgsockfd)
         int len = sizeof(recvaddr);
         char recvbuf[ETHR_FRAME_LEN];
         
-        bzero(&recvaddr, sizeof(struct sockaddr_in));
         
-        Recvfrom(pgsockfd, (void *)recvbuf, ETHR_FRAME_LEN, 0, (SA *)&recvaddr, &len);
+        len = Recvfrom(pgsockfd, (void *)recvbuf, ETHR_FRAME_LEN, 0, NULL, NULL);
         
         Gettimeofday(&tvrecv, NULL);
 
-        proc_v4(recvbuf + 14, sizeof(recvbuf) - 14, &msg, &tvrecv);
+        proc_v4(recvbuf, len, &tvrecv);
         
 }
 
@@ -681,14 +665,14 @@ void send_v4(struct icmp *icmp)
 //	icmp = (struct icmp *) malloc (sizeof(struct icmp));
 	icmp->icmp_type = ICMP_ECHO;
 	icmp->icmp_code = 0;
-	icmp->icmp_id = IP_IDENT;
-	icmp->icmp_seq = 100;
+	icmp->icmp_id = htons(IP_IDENT);
+	icmp->icmp_seq = htons(101);
 	//memset(icmp->icmp_data, 0xa5, datalen);	/* fill with pattern */
-	//Gettimeofday((struct timeval *) icmp->icmp_data, NULL);
+	Gettimeofday((struct timeval *) icmp->icmp_data, NULL);
 
 	//len = 8 + datalen;		/* checksum ICMP header and data */
-	//icmp->icmp_cksum = 0;
-	//icmp->icmp_cksum = in_cksum((u_short *) icmp, len);
+	icmp->icmp_cksum = 0;
+	icmp->icmp_cksum = in_cksum((u_short *) icmp, sizeof(struct icmp));
         //sendechoreq();
 	//Sendto(sockfd, sendbuf, len, 0, pr->sasend, pr->salen);
 }

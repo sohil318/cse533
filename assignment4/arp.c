@@ -238,7 +238,7 @@ void handleAREPPacket(int pfsockfd, char * src_mac, char * dst_mac, arp_pack *pa
                 printmac(entry->hw_addr);
                 printf("\n");
                 write(connfd, entry->hw_addr, MAC_SIZE);
-                Close(connfd);
+                close(connfd);
                 connfd = -1;
                 entry->connfd = -1;
         }
@@ -401,7 +401,7 @@ int main()
 				if(entry != NULL)
 				{
 					write(connfd, entry->hw_addr, 6);
-					Close(connfd);
+					close(connfd);
 					connfd = -1;
 				}
 				// If the entry does not exist in the cache 
@@ -424,7 +424,7 @@ int main()
                                 if (bytes_read == 0){
                                         printf("Timeout detected. Connection closed by tour client.\n");        
                                         delete_cache_entry(connfd);
-                                        Close(connfd);
+                                        close(connfd);
                                         connfd = -1;
                                 }
                         }
