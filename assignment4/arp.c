@@ -159,18 +159,82 @@ void floodARPReq(int pfsockfd, struct writeArq* arq)
         sendARPReq(pfsockfd, packet, packet->src_mac, dst_mac, info->if_index);
 }
 
+/* Handle AREQ */
+void handleAREQPacket(int pfsockfd, char * src_mac, char * dst_mac, arp_pack *packet, int ifaceidx)
+{
+        
+}
 
+/* Handle AREP */
+void handleAREPPacket(int pfsockfd, char * src_mac, char * dst_mac, arp_pack *packet, int ifaceidx, int uxsockfd)
+{
+
+}
+
+
+/* Handle ARP Requests/Responses to PF Packet Socket */
+void handleARPPackets(int pfsockfd, int uxsockfd)
+{
+        /*
+	struct sockaddr_ll saddr;
+ 	int len = sizeof(saddr);
+	void* buff = (void*)malloc(ETH_LEN);
+	arp_pack* arp_p = (arp_pack*) malloc(sizeof(arp_pack));      
+
+        bzero(&saddr,sizeof(saddr));
+        recvfrom(sockfd_raw, buff, ETH_LEN, 0, (SA *)&saddr, &len);
+        memcpy(arp_p, buff + 14, sizeof(arp_pack));
+        */
+
+        struct sockaddr_ll saddr;
+        char src_mac[MAC_SIZE], dst_mac[MAC_SIZE], ether_frame [ETHR_FRAME_LEN], *ptr, hostname[HOST_SIZE];
+        int len, ifaceidx, i;
+        len = sizeof(saddr);
+	arp_pack* packet = (arp_pack*) malloc(sizeof(arp_pack));      
+        
+        recvfrom(pfsockfd, ether_frame, ETHR_FRAME_LEN, 0, (SA *)&saddr, &len);
+        
+        memcpy(packet, ether_frame + 14, sizeof(arp_pack));
+        
+        memcpy(dst_mac, ether_frame, MAC_SIZE);
+        ptr = ether_frame;
+        printf ("\ndst Mac : ");
+        i = IF_HADDR;
+        do {
+                printf("%.2x%s", *ptr++ & 0xff, (i == 1) ? " " : ":");
+        } while (--i > 0);
+        memcpy(src_mac, ether_frame + MAC_SIZE, MAC_SIZE);
+        
+        ptr = src_mac;
+        printf ("\nsrc Mac : ");
+        i = IF_HADDR;
+        do {
+                printf("%.2x%s", *ptr++ & 0xff, (i == 1) ? " " : ":");
+        } while (--i > 0);
+        
+        ifaceidx = saddr.sll_ifindex;
+        
+        if (packet->type == AREQ)
+        {
+                gethostname(hostname, sizeof(hostname));
+                printf("\nIncoming RREQ on vm = %s", hostname);
+                handleAREQPacket(pfsockfd, src_mac, dst_mac, packet, ifaceidx);
+        }
+        else if (packet->type == AREP)
+        {
+                gethostname(hostname, sizeof(hostname));
+                printf("\nIncoming RREP on vm = %s", hostname);
+                handleAREPPacket(pfsockfd, src_mac, dst_mac, packet, ifaceidx, uxsockfd);
+        }
+
+}
 
 int main()
 {
 	int sockfd_raw, sockfd_stream, maxfdp, clientlen, nready;
 	fd_set rset;
-	int len, connfd = -1;
+	int connfd = -1;
 	struct sockaddr_un serveraddr,clientaddr;
-	struct sockaddr_ll saddr;
-	void* buff = (void*)malloc(ETH_LEN);
-	arp_pack* arp_p = (arp_pack*) malloc(sizeof(arp_pack));      
- 	len = sizeof(saddr);
 	char recvBuff[1024];
 	clientlen = sizeof(clientaddr);
 
@@ -232,9 +296,7 @@ int main()
 			// If AREP or AREQ comes on PFPACKET socket
 			if(FD_ISSET(sockfd_raw,&rset))
                 	{
-	                        bzero(&saddr,sizeof(saddr));
-				recvfrom(sockfd_raw, buff, ETH_LEN, 0, (SA *)&saddr, &len);
-                                memcpy(arp_p, buff + 14, sizeof(arp_pack));
+                                handleARPPackets(sockfd_raw, sockfd_stream);
 			}
 
 			// If request comes from areq() API
