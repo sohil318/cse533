@@ -159,6 +159,17 @@ void floodARPReq(int pfsockfd, struct writeArq* arq)
         sendARPReq(pfsockfd, packet, packet->src_mac, dst_mac, info->if_index);
 }
 
+/* Print Mac Address */
+void printmac(char *mac)
+{
+        char *ptr = mac;
+        int i = IF_HADDR;
+        do {
+                printf("%.2x%s", *ptr++ & 0xff, (i == 1) ? " " : ":");
+        } while (--i > 0);
+
+}
+
 /* Handle AREQ */
 void handleAREQPacket(int pfsockfd, char * src_mac, char * dst_mac, arp_pack *packet, int ifaceidx)
 {
@@ -166,14 +177,30 @@ void handleAREQPacket(int pfsockfd, char * src_mac, char * dst_mac, arp_pack *pa
 }
 
 /* Handle AREP */
-void handleAREPPacket(int pfsockfd, char * src_mac, char * dst_mac, arp_pack *packet, int ifaceidx, int uxsockfd)
+void handleAREPPacket(int pfsockfd, char * src_mac, char * dst_mac, arp_pack *packet, int ifaceidx, int connfd)
 {
+
+        cache *entry = (cache *)find_in_cache(packet->src_ip);
+
+        // If an entry is found in the chache
+        if(entry != NULL)
+        {
+                memcpy(entry->hw_addr, src_mac, MAC_SIZE);
+                printf("Updating Cache for mac ::::::");
+                printmac(entry->hw_addr);
+                printf("\n");
+                entry->incomplete = 0;
+                write(connfd, entry->hw_addr, MAC_SIZE);
+                Close(connfd);
+                connfd = -1;
+                entry->connfd = -1;
+        }
 
 }
 
 
 /* Handle ARP Requests/Responses to PF Packet Socket */
-void handleARPPackets(int pfsockfd, int uxsockfd)
+void handleARPPackets(int pfsockfd, int connfd)
 {
         /*
 	struct sockaddr_ll saddr;
@@ -224,7 +251,7 @@ void handleARPPackets(int pfsockfd, int uxsockfd)
         {
                 gethostname(hostname, sizeof(hostname));
                 printf("\nIncoming RREP on vm = %s", hostname);
-                handleAREPPacket(pfsockfd, src_mac, dst_mac, packet, ifaceidx, uxsockfd);
+                handleAREPPacket(pfsockfd, src_mac, dst_mac, packet, ifaceidx, connfd);
         }
 
 }
@@ -296,7 +323,8 @@ int main()
 			// If AREP or AREQ comes on PFPACKET socket
 			if(FD_ISSET(sockfd_raw,&rset))
                 	{
-                                handleARPPackets(sockfd_raw, sockfd_stream);
+                                handleARPPackets(sockfd_raw, connfd);
+                                connfd = -1;
 			}
 
 			// If request comes from areq() API
