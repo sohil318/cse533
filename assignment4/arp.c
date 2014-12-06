@@ -225,7 +225,7 @@ void handleAREPPacket(int pfsockfd, char * src_mac, char * dst_mac, arp_pack *pa
 {
 
         cache *entry = (cache *)find_in_cache(packet->src_ip);
-
+        int bytes_written;
         // If an entry is found in the chache
         if(entry != NULL)
         {
@@ -237,7 +237,7 @@ void handleAREPPacket(int pfsockfd, char * src_mac, char * dst_mac, arp_pack *pa
                 printf("\nSending MAC Addr : ");
                 printmac(entry->hw_addr);
                 printf("\n");
-                write(connfd, entry->hw_addr, MAC_SIZE);
+                bytes_written = write(connfd, entry->hw_addr, MAC_SIZE);
                 close(connfd);
                 connfd = -1;
                 entry->connfd = -1;
@@ -340,7 +340,8 @@ int main()
         
         struct writeArq * recvarq;
         cache* entry;
-
+        int bytes_read;
+        int bytes_written;
         // Print the address pairs found
 
         info = getMacAddr();   
@@ -393,14 +394,14 @@ int main()
  				connfd = accept(sockfd_stream,(struct sockaddr *)&clientaddr, &clientlen);
 				if(errno==EINTR)
 					continue;
-                		read(connfd, recvBuff, sizeof(recvBuff));
+                		bytes_read = read(connfd, recvBuff, sizeof(recvBuff));
 				recvarq = (struct writeArq *)recvBuff;
 				entry = (cache *)find_in_cache(recvarq->ip_addr);
 				
 				// If an entry is found in the chache
 				if(entry != NULL)
 				{
-					write(connfd, entry->hw_addr, 6);
+				bytes_written =	write(connfd, entry->hw_addr, 6);
 					close(connfd);
 					connfd = -1;
 				}
