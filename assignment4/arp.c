@@ -43,6 +43,41 @@ char* getMacAddr()
 }
 
 
+typedef struct arp_packet{
+int type;
+int proto_id;
+unsigned short hatype;
+unsigned char src_mac[6];
+char src_ip[IP_SIZE];
+unsigned char dest_mac[6];
+char dest_ip[IP_SIZE];
+} arp_pack;
+
+/*  Flood ARP Request     */
+void floodARPReq(int pfsockfd, char * ip_addr)
+{
+        arp_pack *packet;
+        packet = createARPPkt();
+
+	char dst_mac[6]  = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+	ifaceInfo *temp = iface;
+	while (temp)    
+        {
+		if(temp->ifaceIdx != ifaceIdx)
+		{
+                        sendARPReq(pfsockfd, pack, temp->haddr, dst_mac, temp->ifaceIdx);
+		}
+                temp = temp->next;
+	}
+
+}
+
+
+/*  Send an ARP Request     */
+void sendARPReq(int sockfd_raw, char * ip_addr)
+{
+}
+
 int main()
 {
 	int sockfd_raw, sockfd_stream, maxfdp, clientlen;
@@ -56,14 +91,15 @@ int main()
 	char recvBuff[1024];
 	clientlen = sizeof(clientaddr);
 
-	bzero(&serveraddr,sizeof(serveraddr));
-        serveraddr.sun_family= AF_LOCAL;
-        strcpy(serveraddr.sun_path,UNIX_PATH);
 
         sockfd_raw = Socket(PF_PACKET, SOCK_RAW, htons(IPPROTO_ID));
         sockfd_stream = Socket(AF_LOCAL, SOCK_STREAM, 0);
 
-	Bind(sockfd_stream,(struct sockaddr*)&serveraddr,sizeof(serveraddr));
+	bzero(&serveraddr,sizeof(serveraddr));
+        serveraddr.sun_family= AF_LOCAL;
+        strcpy(serveraddr.sun_path,UNIX_PATH);
+	
+        Bind(sockfd_stream,(struct sockaddr*)&serveraddr,sizeof(serveraddr));
 
 	Listen(sockfd_stream,LISTENQ);
         
@@ -88,11 +124,25 @@ int main()
 
 			maxfdp = max(maxfdp, connfd);
 			
-               		select(maxfdp,&rset,NULL,NULL,NULL);
+               		nready = select(maxfdp + 1, &rset, NULL, NULL, NULL);
+                        if (nready < 0)
+                        {
+                                if (errno == EINTR)
+                                {
+                                        printf("EINTR error !\n");
+                                        continue;
+                                }
+                                else
+                                {
+                                        perror("select error");
+                                        exit (0);
+                                }
+                        }
                		
 			// If AREP or AREQ comes on PFPACKET socket
 			if(FD_ISSET(sockfd_raw,&rset))
                 	{
+	                        bzero(&saddr,sizeof(saddr));
 				recvfrom(sockfd_raw, buff, ETH_LEN, 0, (SA *)&saddr, &len);
                                 memcpy(arp_p, buff + 14, sizeof(arp_pack));
 			}
@@ -122,10 +172,11 @@ int main()
 				        add_entry(recvarq , connfd); 
                                         // Prepare a req header
 					// Send ARP REQ
+                                        floodARPREQ(sockfd_raw, recvarq->ip_addr);
 				}
 			}
 			// If something is recieved on the connfd
-			if(connfd>-1 && FD_ISSET(connfd, &rset)){
+			if(connfd > -1 && FD_ISSET(connfd, &rset)){
 				// delete incomplete entry on timeout
 		                printf("Recieved something in connfd.\n");
                                 int bytes_read = Read(connfd, recvBuff, sizeof(recvBuff));
