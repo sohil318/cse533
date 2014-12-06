@@ -4,8 +4,9 @@
 #include    "unp.h"
 #include    "utils.h"
 #include    "tour.h"
+#include	"hw_addrs.h"
 
-#define		IPPROTO_ID		1554	 
+#define		IPPROTO_ID		0x1554	 
 #define		AREQ			0
 #define		AREP			1
 #define 	ETH_LEN  		1514
@@ -31,7 +32,7 @@ unsigned char dest_mac[6];
 char dest_ip[IP_SIZE];
 } arp_pack;
 
-char* getMacAddr();
+struct hwa_info * getMacAddrst();
 
 #endif  /* __ARP_h */
 

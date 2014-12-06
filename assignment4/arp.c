@@ -4,11 +4,11 @@
 #include 	<sys/socket.h>
 #include 	<linux/if_ether.h>
 #include 	<linux/if_packet.h>
-#include	"hw_addrs.h"
 
 int ifaceIdx;
+struct hwa_info * info;
 /* Get Host MAC Address */
-char* getMacAddr()
+struct hwa_info * getMacAddrst()
 {
         struct hwa_info	*hwa, *hwahead;
         char   *ptr = NULL, *hptr;
@@ -20,22 +20,7 @@ char* getMacAddr()
 
                 if (strcmp(hwa->if_name, "eth0") == 0)  
                 {
-                        ifaceIdx = hwa->if_index;
-                        prflag = 0;
-                        i = 0;
-                        do {
-                                if (hwa->if_haddr[i] != '\0') {
-                                        prflag = 1;
-                                        break;
-                                }
-                        } while (++i < IF_HADDR);
-
-                        if (prflag) {
-                                printf("         HW addr = ");
-                                ptr = hwa->if_haddr;
-                                memcpy(hptr, hwa->if_haddr, MAC_SIZE);
-                        }
-                        return hptr;
+                        return hwa;
                 }
         }
 
@@ -60,21 +45,26 @@ int main()
         serveraddr.sun_family= AF_LOCAL;
         strcpy(serveraddr.sun_path,UNIX_PATH);
 
+        // PF_PACKET Socket
         sockfd_raw = Socket(PF_PACKET, SOCK_RAW, htons(IPPROTO_ID));
+       
+        // Unix Domain Socket
         sockfd_stream = Socket(AF_LOCAL, SOCK_STREAM, 0);
-
 	Bind(sockfd_stream,(struct sockaddr*)&serveraddr,sizeof(serveraddr));
-
 	Listen(sockfd_stream,LISTENQ);
         
         struct writeArq * recvarq;
         cache* entry;
 
+        // Print the address pairs found
+        info = getMacAddrst();   
+        struct sockaddr_in * ad = (struct sockaddr_in *)info->ip_addr; 
+        printf("IP Address : %ld  |   HW Address : %s \n ", ad->sin_addr.s_addr ,info->if_haddr);
+
 	FD_ZERO(&rset);
 
 	while(1)
         	{
-
                		 FD_ZERO(&rset);
                		 FD_SET(sockfd_raw, &rset);
                		 FD_SET(sockfd_stream, &rset);
@@ -88,7 +78,7 @@ int main()
 
 			maxfdp = max(maxfdp, connfd);
 			
-               		select(maxfdp,&rset,NULL,NULL,NULL);
+               		select(maxfdp+1, &rset, NULL, NULL, NULL);
                		
 			// If AREP or AREQ comes on PFPACKET socket
 			if(FD_ISSET(sockfd_raw,&rset))
@@ -120,8 +110,10 @@ int main()
 					 printf("No entry in cache for %s. Creating an incomplete entry.\n", recvarq->ip_addr);
 					// Add a new incomplete entry
 				        add_entry(recvarq , connfd); 
+                        
                                         // Prepare a req header
-					// Send ARP REQ
+                                        
+                                        // Send ARP REQ
 				}
 			}
 			// If something is recieved on the connfd
@@ -140,4 +132,19 @@ int main()
  
 		return 0;
 	
+}
+
+arp_pack * create_areq_packet(struct writeArq * arq){
+        
+                char ip[IP_SIZE];
+                arp_pack *packet = (arp_pack *)malloc(sizeof(arp_pack));
+                packet->type  = htons(AREQ);
+                packet->proto_id  =  htons(IPPROTO_ID);
+                packet->hatype  =   htonl(arq->hw.sll_hatype);
+                strcpy(packet->src_mac, info->if_haddr);
+                struct sockaddr_in * ad = (struct sockaddr_in *)info->ip_addr;
+                inet_ntop(AF_INET, &(ad->sin_addr), ip, 50);
+                strcpy(packet->src_ip, ip);
+                strcpy(packet->dest_ip, arq->ip_addr);
+                return packet;
 }
