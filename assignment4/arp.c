@@ -213,7 +213,7 @@ void handleAREQPacket(int pfsockfd, char * src_mac, char * dst_mac, arp_pack *pa
 
         if (strcmp(packet->dest_ip, my_ip) == 0)
         {
-                printf("Destination Reached \n");
+                //printf("Destination Reached \n");
                 arep = create_arep_packet(packet);
                 printARPPacket(arep);
                 sendARP(pfsockfd, arep, arep->src_mac, arep->dest_mac, ifaceIdx);
@@ -293,7 +293,8 @@ void handleARPPackets(int pfsockfd, int connfd)
         do {
                 printf("%.2x%s", *ptr++ & 0xff, (i == 1) ? " " : ":");
         } while (--i > 0);
-        
+       
+        printf("\n");
         printARPPacket(packet);
 
         ifaceidx = saddr.sll_ifindex;
@@ -301,13 +302,13 @@ void handleARPPackets(int pfsockfd, int connfd)
         if (packet->type == AREQ)
         {
                 gethostname(hostname, sizeof(hostname));
-                printf("\nIncoming AREQ on vm = %s", hostname);
+                printf("\nIncoming AREQ on %s", hostname);
                 handleAREQPacket(pfsockfd, src_mac, dst_mac, packet, ifaceidx);
         }
         else if (packet->type == AREP)
         {
                 gethostname(hostname, sizeof(hostname));
-                printf("\nIncoming AREP on vm = %s", hostname);
+                printf("\nIncoming AREP on %s", hostname);
                 handleAREPPacket(pfsockfd, src_mac, dst_mac, packet, ifaceidx, connfd);
         }
 

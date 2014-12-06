@@ -22,7 +22,7 @@ int areq (struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr)
 	sendarq.hw.sll_halen = HWaddr->sll_halen;
 	inet_ntop(AF_INET, &(ip->sin_addr), sendarq.ip_addr, IP_SIZE);
 
-	printf("HW address being sought for %s \n", inet_ntoa(ip->sin_addr));
+//	printf("HW address being sought for %s \n", inet_ntoa(ip->sin_addr));
 
 	bzero(&serveraddr, sizeof(struct sockaddr_un));
 	serveraddr.sun_family = AF_LOCAL;
@@ -44,7 +44,6 @@ int areq (struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr)
 	if(FD_ISSET(sockfd, &rset)){
 		read(sockfd, mac, sizeof(mac));
 	        memcpy(HWaddr->sll_addr, mac, 6);
-		printf("\n");
 	}
 	else{
 		printf("areq time out! \n");	
@@ -63,7 +62,7 @@ int add_entry(struct writeArq arq , int connfd)
 	if(arq.hw.sll_addr == NULL)
 		new->incomplete=1;
         
-        printf("<<<< aDDING Src IP : %s >>>\n", arq.ip_addr);
+//        printf("<<<< aDDING Src IP : %s >>>\n", arq.ip_addr);
 	strcpy(new->ip_addr, arq.ip_addr);
 	new->ifindex = arq.hw.sll_ifindex;
 	new->hatype = arq.hw.sll_hatype;
@@ -80,7 +79,7 @@ int add_entry(struct writeArq arq , int connfd)
 	        new->next= cache_head;
 	cache_head= new;
 	
-	printf("added ip: %s\n",new->ip_addr);
+	printf("added ip: %s to cache\n",new->ip_addr);
 	return 0;
 
 }
@@ -118,7 +117,7 @@ cache * find_in_cache(char *ip_addr)
 
     	while (temp)
     	{
-                printf("Cache : %s , incom = %s\n", temp->ip_addr, ip_addr);
+             //   printf("Cache : %s , incom = %s\n", temp->ip_addr, ip_addr);
         	if(strcmp(temp->ip_addr, ip_addr)==0)
         	{
                         return temp;

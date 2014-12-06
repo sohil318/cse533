@@ -302,7 +302,7 @@ int getDestMac(uint32_t dip, struct hwaddr *HWaddr){
 /* Send echo request */
 int send_ping_req(int pfsockfd, int pgsockfd, uint32_t dip)
 {
-        printf("Create and Send Ping Request\n");
+//        printf("Create and Send Ping Request\n");
         uint32_t sip; 
         char src_mac[MAC_SIZE], dst_mac[MAC_SIZE];
         struct ip *ip;
@@ -525,7 +525,7 @@ void handletourpacket(int rtsockfd, int multisockfd, int pgsockfd, int pfsockfd)
         he = gethostbyaddr(&iaddr, sizeof(iaddr), AF_INET);
          
         printf("%.24s: Received source routing packet from %s\n", (char *)ctime(&ticks), he->h_name);
-        printTourPacket(*data);
+        //printTourPacket(*data);
         gethostname(vm_name, sizeof(vm_name));
 
 
@@ -714,7 +714,7 @@ void send_all_ping_req(int pfsockfd, int pgsockfd)
 /* Handle Ping Repies */
 void handlepingreply(int pgsockfd)
 {
-        printf("Handling Echo Replies \n");
+//        printf("Handling Echo Replies \n");
         recv_ping_rep(pgsockfd);
 }
 
@@ -739,7 +739,7 @@ int main(int argc, char *argv[])
                 converthostnametoIP(argc, argv, ipAddrs);
 //              printf("List of IP Addresses main : %s \n", ipAddrs);
                 createPayload(&packet, 0, argc, ipAddrs);
-                printTourPacket(packet);
+                //printTourPacket(packet);
 //                send_tour_packet(rtsockfd, &packet, sizeof(tpayload)); 
                 
                 bzero(&mcast_addr, sizeof(struct sockaddr_in));
