@@ -12,7 +12,7 @@ int areq (struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr)
 	fd_set rset;
 	struct timeval tv;
 	struct writeArq sendarq;
-	char mac[8];
+	char mac[6];
 
 	sockfd = Socket(AF_LOCAL, SOCK_STREAM, 0);
 	ip = (struct sockaddr_in *)IPaddr;
@@ -42,8 +42,9 @@ int areq (struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr)
 	select(sockfd+1, &rset, NULL, NULL, &tv);	
 	
 	if(FD_ISSET(sockfd, &rset)){
-		read(sockfd, &mac, sizeof(mac));
-		for(num=0; num<6; num++)
+		read(sockfd, mac, sizeof(mac));
+	        memcpy(HWaddr->sll_addr, mac, 6);
+        for(num=0; num<6; num++)
 		{
 			printf("%.2x:", mac[num]);			
 		}
@@ -127,3 +128,6 @@ cache * find_in_cache(char *ip_addr)
 
     return temp;
 }
+
+//arp_pack* create_arp_req(int type, int proto_id, unsigned short hatype, ){}
+//arp_pack* create_arp_rep(){}
