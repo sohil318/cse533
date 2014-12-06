@@ -32,7 +32,10 @@ unsigned char dest_mac[6];
 char dest_ip[IP_SIZE];
 } arp_pack;
 
-struct hwa_info * getMacAddrst();
+struct hwa_info * getMacAddr();
+arp_pack * create_areq_packet(struct writeArq * arq);
+void sendARPReq(int sockfd, arp_pack *packet, char *src_mac, char *dst_mac, int ifaceidx);
+void floodARPReq(int pfsockfd, struct writeArq* arq);
 
 #endif  /* __ARP_h */
 
