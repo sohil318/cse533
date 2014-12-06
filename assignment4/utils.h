@@ -18,6 +18,18 @@ struct writeArq{
 	char ip_addr[IP_SIZE];
 };
 
+typedef struct arp_cache
+{
+    char ip_addr[IP_SIZE];
+    unsigned char hw_addr[6];
+    int ifindex;
+    unsigned short hatype;
+    int connfd;
+    int incomplete;
+    struct arp_cache * next;
+}cache;
+
+cache * find_in_cache(char *ip_addr);
 
 #endif  /* __UTILS_h */
 

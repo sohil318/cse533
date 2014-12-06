@@ -10,17 +10,8 @@
 #define		AREQ			0
 #define		AREP			1
 #define 	ETH_LEN  		1514
+#define         SERV_SUN_PATH           "serv_path" 
 
-typedef struct arp_cache
-{
-    char ip_addr[IP_SIZE];
-    unsigned char hw_addr[6];
-    int ifindex;
-    unsigned short hatype;
-    int connfd;
-    int incomplete;
-    struct arp_cache * next;
-}cache;
 
 typedef struct arp_packet{
         int type;
@@ -36,6 +27,7 @@ struct hwa_info * getMacAddr();
 arp_pack * create_areq_packet(struct writeArq * arq);
 void sendARPReq(int sockfd, arp_pack *packet, char *src_mac, char *dst_mac, int ifaceidx);
 void floodARPReq(int pfsockfd, struct writeArq* arq);
+void printARPPacket(arp_pack *packet);
 
 #endif  /* __ARP_h */
 

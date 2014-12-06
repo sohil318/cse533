@@ -277,7 +277,7 @@ char* getSrcMacAddr()
                         } while (++i < IF_HADDR);
 
                         if (prflag) {
-                                printf("         HW addr = ");
+      //                          printf("         HW addr = ");
                                 ptr = hwa->if_haddr;
                                 memcpy(hptr, hwa->if_haddr, MAC_SIZE);
                         }
@@ -288,7 +288,7 @@ char* getSrcMacAddr()
         return NULL;
 }
 
-void getDestMac(uint32_t dip, struct hwaddr *HWaddr){
+int getDestMac(uint32_t dip, struct hwaddr *HWaddr){
         struct sockaddr_in *IPaddr = (struct sockaddr_in *)malloc(sizeof(struct sockaddr_in));
         IPaddr->sin_addr.s_addr = dip;
         int result;
@@ -296,6 +296,7 @@ void getDestMac(uint32_t dip, struct hwaddr *HWaddr){
         HWaddr->sll_hatype = ARPHRD_ETHER;
         HWaddr->sll_halen = ETH_ALEN;
         result = areq ((SA *)IPaddr, sizeof(struct sockaddr_in), HWaddr);
+        return result;
 }
 
 /* Send echo request */
@@ -306,24 +307,24 @@ int send_ping_req(int pfsockfd, int pgsockfd, uint32_t dip)
         int datalen = 4;
         char datac[4] = {'a', 'b', 'c', 'd'};
         char src_mac[MAC_SIZE], dst_mac[MAC_SIZE];
-        struct icmp *icmppkt;
+        struct icmp icmppkt;
         struct ip *ip;
         struct hwaddr HWaddr;
 
         memcpy(src_mac, getSrcMacAddr(), MAC_SIZE);                                             /*      Get Source MAC Address                          */
-        printf("Step 1. \n");
         printf("Source Mac : "); 
-        printf("Step 2. \n");
         printmac(src_mac);
-        printf("Step 3. \n");
         printf("\n");
         
-        getDestMac(dip, &HWaddr);                                                                /*      TODO : Get Dest MAC Address                     */
-        
-        memcpy(dst_mac, HWaddr.sll_addr, MAC_SIZE);
-        sip = getsrcipaddr();
-        send_v4(icmppkt);
+        if (getDestMac(dip, &HWaddr) == -1)                                                                /*      TODO : Get Dest MAC Address                     */
+                return -1;
 
+        memcpy(dst_mac, HWaddr.sll_addr, MAC_SIZE);
+        printmac(dst_mac);
+        printf("\n");
+        sip = getsrcipaddr();
+        send_v4(&icmppkt);
+        
         int send_result = 0;
         struct sockaddr_ll socket_address;                                                      /*      target address                                  */
         void* buffer = (void*)malloc(ETHR_FRAME_LEN);                                           /*      buffer for ethernet frame                       */
@@ -383,7 +384,7 @@ int send_ping_req(int pfsockfd, int pgsockfd, uint32_t dip)
         ip->ip_p   = IPPROTO_ICMP; 
         ip->ip_sum = htons(0);
         
-        memcpy((void *)icmphead, (void *)icmppkt, sizeof(struct icmp));
+        memcpy((void *)icmphead, (void *)&icmppkt, sizeof(struct icmp));
 
         //ip->ip_sum = htons(csum((unsigned short *)buf, userlen));
 
@@ -494,12 +495,12 @@ void handle_final_pings(int pfsockfd, int pgsockfd, uint32_t dip)
                         }
                 }
                 if (nready == 0)                {
-                        printf("1 Second completed. Send Next Ping.\n");
-                        //send_all_ping_req(pfsockfd, pgsockfd);
+//                        printf("1 Second completed. Send Next Ping.\n");
+                        send_all_ping_req(pfsockfd, pgsockfd);
                 }
 		if (FD_ISSET(pgsockfd, &rset))  {	/* socket is readable */
                         recv_ping_rep(pgsockfd);
-                        //send_ping_req(pfsockfd, pgsockfd, dip);
+//                        send_ping_req(pfsockfd, pgsockfd, dip);
 		}
         }
         
@@ -560,7 +561,7 @@ void handletourpacket(int rtsockfd, int multisockfd, int pgsockfd, int pfsockfd)
 
 	                printf("PING %s: %d data bytes\n", str, datalen);
                         pinged_vm[idx] = 1;
-                        //send_ping_req(pfsockfd, pgsockfd, packhead->ip_src.s_addr);
+                        send_ping_req(pfsockfd, pgsockfd, packhead->ip_src.s_addr);
                 }
                 
                 /* Add to Multicast Group */
@@ -589,7 +590,7 @@ void handletourpacket(int rtsockfd, int multisockfd, int pgsockfd, int pfsockfd)
 
 	                printf("PING %s: %d data bytes\n", str, datalen);
                         pinged_vm[idx] = 1;
-                        //send_ping_req(pfsockfd, pgsockfd, packhead->ip_src.s_addr);
+                        send_ping_req(pfsockfd, pgsockfd, packhead->ip_src.s_addr);
                 }
 
         }
@@ -681,7 +682,7 @@ void send_v4(struct icmp *icmp)
 	icmp->icmp_type = ICMP_ECHO;
 	icmp->icmp_code = 0;
 	icmp->icmp_id = IP_IDENT;
-	icmp->icmp_seq = 0;
+	icmp->icmp_seq = 100;
 	//memset(icmp->icmp_data, 0xa5, datalen);	/* fill with pattern */
 	//Gettimeofday((struct timeval *) icmp->icmp_data, NULL);
 
@@ -709,15 +710,20 @@ void send_all_ping_req(int pfsockfd, int pgsockfd)
                                 sprintf(hostname, "vm%d", 10);
                         else
                                 sprintf(hostname, "vm%d", i);
-                }
                 
                 hp = (struct hostent *)gethostbyname((const char *)hostname);	
                 ipaddr = ((struct in_addr *)hp->h_addr_list[0])->s_addr;
-                taddr.s_addr = ipaddr;
-                strcpy(str, inet_ntoa(taddr));
+                
+//                taddr.s_addr = ipaddr;
+//                struct sockaddr_in * ad = (struct sockaddr_in *)ipaddr;
+        
+//                inet_ntop(AF_INET, &(ad->sin_addr), str, 50);
+//                printf("\nReached\n");
+                
 
-                printf("PING %s: %d data bytes\n", str, datalen);
-                //send_ping_req(pfsockfd, pgsockfd, ipaddr);
+                printf("PING %s: %d data bytes\n", hostname, datalen);
+                send_ping_req(pfsockfd, pgsockfd, ipaddr);
+                }
         }
 }
 
@@ -790,8 +796,8 @@ int main(int argc, char *argv[])
                 tv.tv_usec = 0;
                 rset = allset;
 
-                //nready = select(maxfdpl + 1, &rset, NULL, NULL, &tv); 
-                nready = select(maxfdpl + 1, &rset, NULL, NULL, NULL); 
+                nready = select(maxfdpl + 1, &rset, NULL, NULL, &tv); 
+                //nready = select(maxfdpl + 1, &rset, NULL, NULL, NULL); 
 	        if (nready < 0)
                 {
                         if (errno == EINTR)
@@ -806,8 +812,8 @@ int main(int argc, char *argv[])
                         }
                 }
                 if (nready == 0)                {
-                        printf("1 Second completed. Send Next Ping.\n");
-                        //send_all_ping_req(pfsockfd, pgsockfd);
+                        //printf("1 Second completed. Send Next Ping.\n");
+                        send_all_ping_req(pfsockfd, pgsockfd);
                 }
 		if (FD_ISSET(rtsockfd, &rset))  {	/* socket is readable */
                         handletourpacket(rtsockfd, multisockfd, pgsockfd, pfsockfd);

@@ -36,11 +36,11 @@ arp_pack * create_areq_packet(struct writeArq * arq)
         struct sockaddr_in * ad = (struct sockaddr_in *)info->ip_addr;
         arp_pack *packet = (arp_pack *)malloc(sizeof(arp_pack));
         
-        packet->type  = htons(AREQ);
-        packet->proto_id  =  htons(IPPROTO_ID);
-        packet->hatype  =   htonl(arq->hw.sll_hatype);
+        packet->type  = AREQ;
+        packet->proto_id  =  IPPROTO_ID;
+        packet->hatype  =   arq->hw.sll_hatype;
         
-        strcpy(packet->src_mac, info->if_haddr);
+        memcpy(packet->src_mac, info->if_haddr, 6);
         
         inet_ntop(AF_INET, &(ad->sin_addr), ip, 50);
         strcpy(packet->src_ip, ip);
@@ -56,16 +56,16 @@ arp_pack * create_arep_packet(arp_pack * arq)
 //        struct sockaddr_in * ad = (struct sockaddr_in *)info->ip_addr;
         arp_pack *packet = (arp_pack *)malloc(sizeof(arp_pack));
         
-        packet->type  = htons(AREP);
-        packet->proto_id  =  htons(IPPROTO_ID);
-        packet->hatype  =   htonl(arq->hatype);
+        packet->type  = AREP;
+        packet->proto_id  =  IPPROTO_ID;
+        packet->hatype  =   arq->hatype;
         
-        strcpy(packet->src_mac, info->if_haddr);
+        memcpy(packet->src_mac, info->if_haddr, 6);
         
 //        inet_ntop(AF_INET, &(ad->sin_addr), ip, 50);
         strcpy(packet->src_ip, arq->dest_ip);
         strcpy(packet->dest_ip, arq->src_ip);
-        strcpy(packet->dest_mac, arq->src_mac);
+        memcpy(packet->dest_mac, arq->src_mac, MAC_SIZE);
         return packet;
 }
 
@@ -85,7 +85,7 @@ void sendARP(int sockfd, arp_pack *packet, char *src_mac, char *dst_mac, int ifa
 
         /*      Prepare sockaddr_ll     */
         socket_address.sll_family   =   PF_PACKET;                      /*      RAW communication                               */  
-        socket_address.sll_protocol =   htons(ETH_P_IP);                /*      We don't use a protocoll above ethernet layer just use anything here.  */
+        socket_address.sll_protocol =   htons(IPPROTO_ID);                /*      We don't use a protocoll above ethernet layer just use anything here.  */
         socket_address.sll_ifindex  =   ifaceidx;                       /*      Interface Index of the network device in function parameter     */
 
         
@@ -155,7 +155,7 @@ void sendARP(int sockfd, arp_pack *packet, char *src_mac, char *dst_mac, int ifa
         printf("\n\t  src %s ip : %s ", he->h_name, packet->src_ip);
         inet_pton(AF_INET, packet->dest_ip, &ipadr);
         he1 = gethostbyaddr(&ipadr, sizeof(ipadr), AF_INET);
-        printf(", dst %s ip %s, msg_type : %d\n",  he1->h_name, packet->dest_ip, ntohl(packet->type));
+        printf(", dst %s ip %s, msg_type : %d\n",  he1->h_name, packet->dest_ip, packet->type);
         
 }
 
@@ -213,7 +213,9 @@ void handleAREQPacket(int pfsockfd, char * src_mac, char * dst_mac, arp_pack *pa
 
         if (strcmp(packet->dest_ip, my_ip) == 0)
         {
+                printf("Destination Reached \n");
                 arep = create_arep_packet(packet);
+                printARPPacket(arep);
                 sendARP(pfsockfd, arep, arep->src_mac, arep->dest_mac, ifaceIdx);
         }        
 }
@@ -232,6 +234,9 @@ void handleAREPPacket(int pfsockfd, char * src_mac, char * dst_mac, arp_pack *pa
                 printmac(entry->hw_addr);
                 printf("\n");
                 entry->incomplete = 0;
+                printf("\nSending MAC Addr : ");
+                printmac(entry->hw_addr);
+                printf("\n");
                 write(connfd, entry->hw_addr, MAC_SIZE);
                 Close(connfd);
                 connfd = -1;
@@ -240,6 +245,13 @@ void handleAREPPacket(int pfsockfd, char * src_mac, char * dst_mac, arp_pack *pa
 
 }
 
+void printARPPacket(arp_pack *packet)
+{
+        printf("Packet Contents : Packet Type = %d, protoid = %d, src_ip = %s, dst_ip = %s Srcmac : ", packet->type, packet->proto_id, packet->src_ip, packet->dest_ip);
+        printmac(packet->src_mac);
+        printf("Dest Mac : ");
+        printmac(packet->dest_mac);
+}
 
 /* Handle ARP Requests/Responses to PF Packet Socket */
 void handleARPPackets(int pfsockfd, int connfd)
@@ -261,6 +273,7 @@ void handleARPPackets(int pfsockfd, int connfd)
         len = sizeof(saddr);
 	arp_pack* packet = (arp_pack*) malloc(sizeof(arp_pack));      
         
+        bzero(&saddr, sizeof(saddr));
         recvfrom(pfsockfd, ether_frame, ETHR_FRAME_LEN, 0, (SA *)&saddr, &len);
         
         memcpy(packet, ether_frame + 14, sizeof(arp_pack));
@@ -281,18 +294,20 @@ void handleARPPackets(int pfsockfd, int connfd)
                 printf("%.2x%s", *ptr++ & 0xff, (i == 1) ? " " : ":");
         } while (--i > 0);
         
+        printARPPacket(packet);
+
         ifaceidx = saddr.sll_ifindex;
-        
+         
         if (packet->type == AREQ)
         {
                 gethostname(hostname, sizeof(hostname));
-                printf("\nIncoming RREQ on vm = %s", hostname);
+                printf("\nIncoming AREQ on vm = %s", hostname);
                 handleAREQPacket(pfsockfd, src_mac, dst_mac, packet, ifaceidx);
         }
         else if (packet->type == AREP)
         {
                 gethostname(hostname, sizeof(hostname));
-                printf("\nIncoming RREP on vm = %s", hostname);
+                printf("\nIncoming AREP on vm = %s", hostname);
                 handleAREPPacket(pfsockfd, src_mac, dst_mac, packet, ifaceidx, connfd);
         }
 
@@ -313,7 +328,8 @@ int main()
        
         // Unix Domain Socket
         sockfd_stream = Socket(AF_LOCAL, SOCK_STREAM, 0);
-
+        
+        unlink(UNIX_PATH);
 	bzero(&serveraddr,sizeof(serveraddr));
         serveraddr.sun_family= AF_LOCAL;
         strcpy(serveraddr.sun_path,UNIX_PATH);
@@ -326,9 +342,11 @@ int main()
         cache* entry;
 
         // Print the address pairs found
+
         info = getMacAddr();   
         struct sockaddr_in * ad = (struct sockaddr_in *)info->ip_addr; 
-        printf("IP Address : %s  |   HW Address : %s \n ", inet_ntoa(ad->sin_addr) ,info->if_haddr);
+        printf("IP Address : %s  |   HW Address : ", inet_ntoa(ad->sin_addr));
+        printmac(info->if_haddr);
 
 	FD_ZERO(&rset);
 
@@ -391,7 +409,7 @@ int main()
 				{
 					 printf("No entry in cache for %s. Creating an incomplete entry.\n", recvarq->ip_addr);
 					// Add a new incomplete entry
-				        add_entry(recvarq , connfd); 
+				        add_entry(*recvarq , connfd); 
                         
                                         // Prepare a req header
 					// Send ARP REQ

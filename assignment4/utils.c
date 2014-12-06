@@ -6,7 +6,7 @@ cache * cache_head = NULL;
 
 int areq (struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr)
 {
-	int len, sockfd, ret, num;
+	int len, sockfd, ret = 0, num;
 	struct sockaddr_un serveraddr;
 	struct sockaddr_in *ip;
 	fd_set rset;
@@ -44,15 +44,12 @@ int areq (struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr)
 	if(FD_ISSET(sockfd, &rset)){
 		read(sockfd, mac, sizeof(mac));
 	        memcpy(HWaddr->sll_addr, mac, 6);
-        for(num=0; num<6; num++)
-		{
-			printf("%.2x:", mac[num]);			
-		}
 		printf("\n");
 	}
 	else{
 		printf("areq time out! \n");	
 		ret = -1;
+                close(sockfd);
 	}
 	return ret;
 }
@@ -65,7 +62,8 @@ int add_entry(struct writeArq arq , int connfd)
 
 	if(arq.hw.sll_addr == NULL)
 		new->incomplete=1;
-
+        
+        printf("<<<< aDDING Src IP : %s >>>\n", arq.ip_addr);
 	strcpy(new->ip_addr, arq.ip_addr);
 	new->ifindex = arq.hw.sll_ifindex;
 	new->hatype = arq.hw.sll_hatype;
@@ -120,6 +118,7 @@ cache * find_in_cache(char *ip_addr)
 
     	while (temp)
     	{
+                printf("Cache : %s , incom = %s\n", temp->ip_addr, ip_addr);
         	if(strcmp(temp->ip_addr, ip_addr)==0)
         	{
                         return temp;
