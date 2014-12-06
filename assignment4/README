@@ -22,9 +22,9 @@ Below, we have explained some of the details about our design and implementation
 -------------------------------------------------------------------------------------------------------------------------------------------------
 - HOW TO RUN:
 
-  ./tour_sgupta_sgandhi [vm2 vm10 vm4 vm7...vm8]  : To run tour module on a node. The route to be followed is given as commandline parameter.
+  ./sogaship_tour [vm2 vm10 vm4 vm7...vm8]  : To run tour module on a node. The route to be followed is given as commandline parameter.
 
-  ./arp_sgupta_sgandhi : To run arp on a given node.
+  ./sogaship_arp : To run arp on a given node.
 
 
 
