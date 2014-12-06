@@ -23,13 +23,13 @@ typedef struct arp_cache
 }cache;
 
 typedef struct arp_packet{
-int type;
-int proto_id;
-unsigned short hatype;
-unsigned char src_mac[6];
-char src_ip[IP_SIZE];
-unsigned char dest_mac[6];
-char dest_ip[IP_SIZE];
+        int type;
+        int proto_id;
+        unsigned short hatype;
+        unsigned char src_mac[6];
+        char src_ip[IP_SIZE];
+        unsigned char dest_mac[6];
+        char dest_ip[IP_SIZE];
 } arp_pack;
 
 struct hwa_info * getMacAddr();
